@@ -1,0 +1,176 @@
+import React, { useEffect, useState } from 'react'
+import { db, Budget, Transaction, Account } from '../db/indexeddb'
+import { formatCurrency } from '../utils/currency'
+
+export default function BudgetsPage() {
+  const [items, setItems] = useState<Budget[]>([])
+  const [name, setName] = useState('')
+  const [amount, setAmount] = useState<number>(0)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [currency, setCurrency] = useState('USD')
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [categoryFilter, setCategoryFilter] = useState('')
+
+  useEffect(() => {
+    let mounted = true
+    Promise.all([
+      db.getAll<Budget>('budgets'),
+      db.getMeta<string>('currency'),
+      db.getAll<Transaction>('transactions'),
+      db.getAll<Account>('accounts')
+    ]).then(([budgets, curr, txs, accs]) => {
+      if (mounted) {
+        setItems(budgets)
+        setCurrency(curr || 'USD')
+        setTransactions(txs)
+        setAccounts(accs)
+        setLoading(false)
+      }
+    })
+    return () => { mounted = false }
+  }, [])
+
+  // Calculate spending for a budget by summing transactions assigned to it
+  const getSpending = (budgetId: string) => {
+    // Get current month transactions
+    const now = new Date()
+    const currentMonth = now.toISOString().slice(0, 7) // YYYY-MM
+    
+    const monthTransactions = transactions.filter(t => 
+      t.date.startsWith(currentMonth) && t.budgetId === budgetId
+    )
+    
+    let totalSpending = 0
+    for (const tx of monthTransactions) {
+      for (const line of tx.lines) {
+        // Count absolute amounts as spending (regardless of sign)
+        // In double-entry, expenses are negative; in simple mode, expenses are also negative
+        if (line.amount < 0) {
+          totalSpending += Math.abs(line.amount)
+        }
+      }
+    }
+    
+    return totalSpending
+  }
+
+  async function create() {
+    if (!name) return
+    const b: Budget = { id: `bud:${Date.now()}`, name, amount }
+    await db.put('budgets', b)
+    const [budgets, txs] = await Promise.all([
+      db.getAll('budgets'),
+      db.getAll('transactions')
+    ])
+    setItems(budgets)
+    setTransactions(txs)
+    setName('')
+    setAmount(0)
+  }
+
+  async function startEdit(b: Budget) {
+    setEditingId(b.id)
+    setName(b.name)
+    setAmount(b.amount)
+  }
+
+  async function saveEdit() {
+    if (!editingId) return
+    const b = await db.get<Budget>('budgets', editingId)
+    if (!b) return
+    b.name = name
+    b.amount = amount
+    await db.put('budgets', b)
+    const budgets = await db.getAll('budgets')
+    setItems(budgets)
+    setEditingId(null)
+    setName('')
+    setAmount(0)
+  }
+
+  async function remove(id: string) {
+    await db.delete('budgets', id)
+    setItems(await db.getAll('budgets'))
+  }
+
+  return (
+    <div className="page container">
+      <h2>💰 Budgets</h2>
+      {loading ? (
+        <div className="card" style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>Loading budgets...</div>
+      ) : (
+        <>
+      <div className="card" style={{marginBottom:12}}>
+        <h3 style={{marginTop: 0, marginBottom: 12}}>{editingId ? '✏️ Edit Budget' : '➕ Create Budget'}</h3>
+        <input placeholder="Name" value={name} onChange={(e)=>setName(e.target.value)} />
+        <input placeholder="Amount" type="number" value={amount} onChange={(e)=>setAmount(Number(e.target.value))} />
+        {editingId ? (
+          <div style={{display: 'flex', gap: 8}}>
+            <button onClick={saveEdit} className="button-primary">💾 Save</button>
+            <button onClick={()=>{setEditingId(null); setName(''); setAmount(0)}} className="button-secondary">❌ Cancel</button>
+          </div>
+        ) : (
+          <button onClick={create} className="button-primary">➕ Add Budget</button>
+        )}
+      </div>
+
+      <ul className="list">
+        {items.map((b) => {
+          const spending = getSpending(b.id)
+          const percentage = Math.min((spending / b.amount) * 100, 100)
+          const isOverBudget = spending > b.amount
+          
+          return (
+          <li key={b.id}>
+            <div style={{marginBottom: 8}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center', marginBottom: 4}}>
+                <span style={{fontWeight: 500}}>{b.name}</span>
+                <div style={{display:'flex',gap:8}}>
+                  <button onClick={()=>startEdit(b)} className="button-primary">✏️ Edit</button>
+                  <button onClick={()=>remove(b.id)} className="button-danger">🗑️ Delete</button>
+                </div>
+              </div>
+              
+              <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: 6}}>
+                <span style={{color: isOverBudget ? '#ef4444' : '#10b981', fontWeight: 500}}>
+                  {formatCurrency(spending, currency)}
+                </span>
+                {' '} of {formatCurrency(b.amount, currency)}
+                {' '} ({percentage.toFixed(0)}%)
+              </div>
+              
+              <div style={{
+                height: 8,
+                background: '#e5e7eb',
+                borderRadius: 4,
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${percentage}%`,
+                  height: '100%',
+                  background: isOverBudget ? '#ef4444' : '#10b981',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
+          </li>
+        )})}  
+      </ul>
+      
+      {items.length === 0 && (
+        <div className="card" style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>
+          📊 No budgets yet. Create one above!
+        </div>
+      )}
+      
+      <div className="card" style={{marginTop: 12, fontSize: '0.875rem', color: '#6b7280'}}>
+        <strong>Note:</strong> Budget tracking uses transactions assigned to each budget.
+        Spending is calculated from current month's transactions with negative amounts.
+      </div>
+        </>
+      )}
+    </div>
+  )
+}
