@@ -9,27 +9,44 @@ Lightweight double-entry budgeting app built with React + Vite + TypeScript. Tra
 ### Core Budgeting
 - **Offline-first storage** using IndexedDB (`idb`) — see `src/db/indexeddb.ts`
 - **Flexible transaction modes** — Toggle between double-entry accounting (balanced transactions) and simple mode (quick income/expense tracking)
-- **Multi-currency support** — configure your preferred currency with automatic formatting
+- **Multi-currency support** — Configure your preferred currency (USD/IDR) with automatic formatting
 - **Account management** — Track bank, cash, credit, and other account types with real-time balances
 - **Budget categorization** — Assign transactions to budgets for better tracking and organization
+- **Transaction tags** — Add comma-separated tags to transactions for flexible categorization and filtering
+- **Quick transfers** — Transfer money between accounts with a dedicated transfer tool
 
 ### Advanced Features
 - **Recurring Transactions** — Set up daily, weekly, monthly, or yearly automatic transactions
 - **Budget Tracking** — Create budgets and track actual spending vs planned amounts with visual progress bars
 - **Reports & Insights** — Comprehensive analytics with:
-  - Income vs expenses analysis
+  - Income vs expenses analysis (excludes transfers)
   - Spending by account (pie charts)
   - Transaction trends over time (line charts)
   - Account balance distribution
   - Top active accounts
-  - Time-range filtering (week, month, year, all-time)
+  - Time-range filtering (week, month, year, all-time, custom date range)
+  - Tag-based filtering
+  - Support for both transaction modes
 - **Enhanced Dashboard** — Quick overview with summary cards, charts, and recent transactions
-- **Search & Filter** — Find transactions by description, date, or account
+- **Search & Filter** — Find transactions by description, date, account, or tag
+- **Dark Mode** — Full dark theme support with toggle in Settings
 
-### PWA & Sync
+### User Experience
+- **Hamburger Navigation** — Side menu with version info in footer
+- **Floating Action Button** — Quick access to create transactions
+- **Default Settings** — Set default account and budget for new transactions
+- **Responsive Design** — Mobile-first, works on all screen sizes
+
+### PWA & Data Management
 - **Progressive Web App** — Install on mobile devices, works offline
 - **Automatic Service Worker** — Powered by vite-plugin-pwa for robust offline caching
+- **Export/Import** — Backup and restore all data via JSON files
+- **Factory Reset** — Clear all data and start fresh
 - **Firebase sync stub** — Basic cloud sync infrastructure (requires configuration)
+
+### Developer Tools
+- **Version Management** — CLI tools to bump major, minor, or patch versions
+- **Firebase Hosting** — Pre-configured for easy deployment
 
 ## Getting Started
 
@@ -125,6 +142,104 @@ Save time when creating transactions by setting default values in Settings:
 - **Default Account** — Pre-fills the account field when creating new transactions
 - **Default Budget** — Pre-fills the budget field for automatic categorization
 
+These settings are optional and can be changed on a per-transaction basis.
+
+## Feature Status
+
+### ✅ Implemented Features
+
+**Core Functionality**
+- ✅ Offline-first storage with IndexedDB
+- ✅ Double-entry and simple transaction modes (toggle in Settings)
+- ✅ Multi-currency support (USD, IDR)
+- ✅ Account management (create, edit, delete with balance tracking)
+- ✅ Budget creation and tracking with progress bars
+- ✅ Transaction tags (CSV format input, filter by tags)
+- ✅ Quick transfer between accounts
+
+**User Experience**
+- ✅ Dark mode toggle (Settings → Appearance)
+- ✅ Hamburger side navigation menu
+- ✅ Floating Action Button (FAB) for quick transaction creation
+- ✅ Default account and budget settings
+- ✅ Version display in menu footer
+
+**Transactions**
+- ✅ Create/edit/delete transactions
+- ✅ Search by description or date
+- ✅ Filter by account
+- ✅ Filter by tags
+- ✅ Budget assignment per transaction
+- ✅ Transaction tags support
+
+**Reports & Analytics**
+- ✅ Income vs expenses analysis
+- ✅ Spending by account (pie charts)
+- ✅ Transaction trends over time (line charts)
+- ✅ Account balance distribution
+- ✅ Top active accounts
+- ✅ Time-range filtering (week, month, year, all-time, custom)
+- ✅ Tag-based filtering in reports
+- ✅ Transfer exclusion from expense calculations
+- ✅ Simple mode support in reports
+
+**Data Management**
+- ✅ Export all data to JSON file
+- ✅ Import data from JSON file
+- ✅ Factory reset functionality
+- ✅ Recurring transactions (daily, weekly, monthly, yearly)
+- ✅ Manual processing of recurring transactions
+
+**PWA Features**
+- ✅ Progressive Web App with manifest.json
+- ✅ Service worker for offline caching
+- ✅ Mobile-first responsive design
+
+**Developer Tools**
+- ✅ Version bump CLI (major, minor, patch)
+- ✅ Firebase hosting configuration
+- ✅ Deployment scripts
+
+### ⚠️ Partially Implemented
+
+**Firebase Sync**
+- ⚠️ Basic sync infrastructure exists but requires configuration
+- ⚠️ No authentication implemented
+- ⚠️ No per-user data namespacing
+- ⚠️ No conflict resolution
+- ⚠️ Sync queue exists but not fully integrated
+
+### ❌ Not Implemented (Future Enhancements)
+
+**Authentication & Sync**
+- ❌ Firebase Authentication
+- ❌ Multi-device sync with conflict resolution
+- ❌ Per-user data isolation
+
+**Advanced Features**
+- ❌ Multi-currency transactions (single transaction with multiple currencies)
+- ❌ Receipt attachments
+- ❌ Undo/redo functionality
+- ❌ Automatic recurring transaction processing (background)
+- ❌ Budget templates
+- ❌ Spending limits and alerts
+- ❌ Bill reminders
+- ❌ Savings goals tracking
+
+**Testing & Quality**
+- ❌ Unit tests
+- ❌ Integration tests
+- ❌ End-to-end tests
+- ❌ Performance optimization audit
+
+**UX Enhancements**
+- ❌ Drag-and-drop transaction reordering
+- ❌ Bulk transaction operations
+- ❌ Transaction splitting
+- ❌ Custom currency addition
+- ❌ CSV import/export for transactions
+- ❌ PDF export for reports
+
 ## PWA Installation
 
 The app includes a `manifest.json` and automatic service worker generation via `vite-plugin-pwa`. To make it fully installable:
@@ -161,21 +276,27 @@ The repo includes basic Firebase/Firestore sync stubs in `src/services/firebase.
 
 - **Account deletion** cascades to associated transactions (with confirmation)
 - **Currency** is stored in meta but applied site-wide through `formatCurrency` utility
-- **Budget matching** uses name similarity between budgets and accounts
+- **Transfers** are automatically excluded from expense calculations in reports
+- **Transaction tags** support comma-separated values for flexible categorization
+- **Dark mode** persists across sessions and applies immediately
 - **Concurrent updates** may have race conditions in balance calculations (use transactions for critical operations)
 - **Recurring processing** is manual via button click (could be automated with background sync)
+- **Reports** automatically adapt to transaction mode (double-entry vs simple)
 
-## Future Enhancements
+## Roadmap & Future Enhancements
 
-Consider adding:
-- Firebase Authentication for multi-device sync
-- Conflict resolution for offline sync
-- Tests (unit, integration, E2E)
-- Multi-currency transaction support
-- Receipt attachments
-- Undo/redo functionality
-- Category tags for better reporting
-- Scheduled automatic recurring transaction processing
+See the **Feature Status** section above for a complete breakdown of implemented vs planned features.
+
+Priority enhancements under consideration:
+1. **Firebase Authentication** - Enable multi-user support and cloud sync
+2. **Automated recurring transactions** - Background processing without manual trigger
+3. **Testing suite** - Unit, integration, and E2E tests
+4. **Receipt attachments** - Photo/file uploads linked to transactions
+5. **Advanced budgeting** - Templates, alerts, spending limits
+6. **Enhanced export** - CSV and PDF formats
+7. **Transaction splitting** - Split single transaction across multiple budgets/categories
+
+For detailed feature requests or contributions, see the repository issues.
 
 ## Development
 
