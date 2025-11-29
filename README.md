@@ -52,6 +52,14 @@ npm run build
 npm run preview
 ```
 
+### Deploy to Firebase Hosting
+
+```bash
+npm run deploy
+```
+
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.
+
 ## Project Structure
 
 ```

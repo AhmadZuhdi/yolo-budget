@@ -52,3 +52,5 @@ workbox-*.js
 *.db
 *.sqlite
 *.sqlite3
+
+.firebase/*.cache
