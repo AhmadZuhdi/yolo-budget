@@ -3,12 +3,27 @@
   --accent-dark:#0d9290;
   --accent-light:#e0f7f6;
   --bg:#f9fafb;
+  --bg-secondary:#ffffff;
   --text:#0f172a;
   --text-secondary:#6b7280;
   --border:#e5e7eb;
   --success:#10b981;
   --danger:#ef4444;
   --warning:#f59e0b;
+}
+
+[data-theme="dark"]{
+  --accent:#14b8b7;
+  --accent-dark:#0ea5a4;
+  --accent-light:#1e3a3a;
+  --bg:#0f172a;
+  --bg-secondary:#1e293b;
+  --text:#f1f5f9;
+  --text-secondary:#94a3b8;
+  --border:#334155;
+  --success:#34d399;
+  --danger:#f87171;
+  --warning:#fbbf24;
 }
 
 *{box-sizing:border-box}
@@ -65,7 +80,7 @@ body{
   right:-300px;
   width:280px;
   height:100vh;
-  background:white;
+  background:var(--bg-secondary);
   box-shadow:-2px 0 10px rgba(0,0,0,0.1);
   z-index:1000;
   transition:right 0.3s ease;
@@ -226,7 +241,7 @@ body{
 .list li:last-child{border-bottom:none}
 
 .card{
-  background:#fff;
+  background:var(--bg-secondary);
   padding:20px;
   border-radius:12px;
   box-shadow:0 1px 3px rgba(0,0,0,0.08);
@@ -255,7 +270,7 @@ input,select,textarea{
   font-size:0.95rem;
   font-family:inherit;
   transition:all 0.2s ease;
-  background:#fff;
+  background:var(--bg-secondary);
   color:var(--text);
 }
 input:focus,select:focus,textarea:focus{

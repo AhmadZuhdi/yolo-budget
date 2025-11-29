@@ -23,6 +23,7 @@ export type Transaction = {
   date: string
   description?: string
   budgetId?: string
+  tags?: string[]
   lines: TransactionLine[]
 }
 

@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
 import AccountsPage from './pages/Accounts'
 import BudgetsPage from './pages/Budgets'
@@ -8,8 +8,18 @@ import RecurringTransactionsPage from './pages/RecurringTransactions'
 import ReportsPage from './pages/Reports'
 import Nav from './components/Nav'
 import SettingsPage from './pages/Settings'
+import { db } from './db/indexeddb'
 
 export default function App() {
+  useEffect(() => {
+    // Apply dark mode on initial load
+    db.getMeta<boolean>('darkMode').then(darkMode => {
+      if (darkMode) {
+        document.documentElement.setAttribute('data-theme', 'dark')
+      }
+    })
+  }, [])
+
   return (
     <div className="app">
       <header className="topbar">

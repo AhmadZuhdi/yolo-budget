@@ -12,6 +12,8 @@ export default function ReportsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
+  const [doubleEntry, setDoubleEntry] = useState(true)
+  const [filterTag, setFilterTag] = useState('')
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year' | 'all' | 'custom'>('month')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -21,16 +23,18 @@ export default function ReportsPage() {
   }, [])
 
   async function loadData() {
-    const [txs, accs, buds, curr] = await Promise.all([
+    const [txs, accs, buds, curr, de] = await Promise.all([
       db.getAll<Transaction>('transactions'),
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
-      db.getMeta<string>('currency')
+      db.getMeta<string>('currency'),
+      db.getMeta<boolean>('doubleEntry')
     ])
     setTransactions(txs)
     setAccounts(accs)
     setBudgets(buds)
     setCurrency(curr || 'USD')
+    setDoubleEntry(de !== false)
     setLoading(false)
   }
 
@@ -63,11 +67,26 @@ export default function ReportsPage() {
       const txDate = new Date(t.date)
       const isAfterStart = txDate >= startDateObj
       const isBeforeEnd = endDateObj ? txDate <= endDateObj : true
-      return isAfterStart && isBeforeEnd
+      const matchesTag = !filterTag || (t.tags && t.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase())))
+      return isAfterStart && isBeforeEnd && matchesTag
     })
   }
 
   const filteredTxs = getFilteredTransactions()
+
+  // Helper function to check if a transaction is a transfer between accounts
+  const isTransfer = (tx: Transaction): boolean => {
+    // A transfer has exactly 2 lines with opposite amounts (one negative, one positive)
+    if (tx.lines.length !== 2) return false
+    const amounts = tx.lines.map(l => l.amount)
+    // Check if amounts sum to 0 (balanced) and both are for different accounts
+    const isBalanced = Math.abs(amounts[0] + amounts[1]) < 0.01
+    const differentAccounts = tx.lines[0].accountId !== tx.lines[1].accountId
+    return isBalanced && differentAccounts
+  }
+
+  // Filter out transfers for expense calculations
+  const nonTransferTxs = filteredTxs.filter(tx => !isTransfer(tx))
 
   // Account balances for pie chart
   const accountBalanceData = {
@@ -81,9 +100,9 @@ export default function ReportsPage() {
     }]
   }
 
-  // Spending by account (pie chart)
+  // Spending by account (pie chart) - exclude transfers
   const spendingByAccount: Record<string, number> = {}
-  filteredTxs.forEach(tx => {
+  nonTransferTxs.forEach(tx => {
     tx.lines.forEach(line => {
       if (line.amount < 0) {
         const accountName = accounts.find(a => a.id === line.accountId)?.name || 'Unknown'
@@ -91,6 +110,14 @@ export default function ReportsPage() {
       }
     })
   })
+  
+  // In double-entry mode, each expense is recorded twice (once positive, once negative)
+  // So we divide by 2 to get the actual spending
+  if (doubleEntry) {
+    Object.keys(spendingByAccount).forEach(key => {
+      spendingByAccount[key] /= 2
+    })
+  }
 
   const spendingData = {
     labels: Object.keys(spendingByAccount),
@@ -103,12 +130,14 @@ export default function ReportsPage() {
     }]
   }
 
-  // Daily transaction trend
+  // Daily transaction trend - exclude transfers
   const dailyTotals: Record<string, number> = {}
-  filteredTxs.forEach(tx => {
+  nonTransferTxs.forEach(tx => {
     const date = tx.date
-    const total = tx.lines.reduce((sum, l) => sum + Math.abs(l.amount), 0) / 2 // Divide by 2 since double-entry
-    dailyTotals[date] = (dailyTotals[date] || 0) + total
+    const total = tx.lines.reduce((sum, l) => sum + Math.abs(l.amount), 0)
+    // In double-entry mode, divide by 2 since each transaction is counted twice
+    const adjustedTotal = doubleEntry ? total / 2 : total
+    dailyTotals[date] = (dailyTotals[date] || 0) + adjustedTotal
   })
 
   const sortedDates = Object.keys(dailyTotals).sort()
@@ -123,11 +152,11 @@ export default function ReportsPage() {
     }]
   }
 
-  // Income vs Expenses
+  // Income vs Expenses - exclude transfers
   let totalIncome = 0
   let totalExpenses = 0
   
-  filteredTxs.forEach(tx => {
+  nonTransferTxs.forEach(tx => {
     tx.lines.forEach(line => {
       if (line.amount > 0) {
         totalIncome += line.amount
@@ -138,8 +167,10 @@ export default function ReportsPage() {
   })
 
   // Adjust for double-entry (each transaction counted twice)
-  totalIncome /= 2
-  totalExpenses /= 2
+  if (doubleEntry) {
+    totalIncome /= 2
+    totalExpenses /= 2
+  }
 
   const incomeExpenseData = {
     labels: ['Income', 'Expenses'],
@@ -229,6 +260,17 @@ export default function ReportsPage() {
                 </div>
               </div>
             )}
+            
+            {/* Tag Filter */}
+            <div style={{marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)'}}>
+              <label style={{fontSize: '0.875rem', marginBottom: 4, display: 'block'}}>🏷️ Filter by Tag</label>
+              <select value={filterTag} onChange={(e) => setFilterTag(e.target.value)} style={{width: '100%'}}>
+                <option value="">All tags</option>
+                {Array.from(new Set(transactions.flatMap(t => t.tags || []))).sort().map(tag => (
+                  <option key={tag} value={tag}>{tag}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Summary Cards */}

@@ -4,6 +4,7 @@ import { db, Account, Budget } from '../db/indexeddb'
 export default function SettingsPage() {
   const [currency, setCurrency] = useState('USD')
   const [doubleEntry, setDoubleEntry] = useState(true)
+  const [darkMode, setDarkMode] = useState(false)
   const [loading, setLoading] = useState(true)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -15,14 +16,16 @@ export default function SettingsPage() {
     Promise.all([
       db.getMeta('currency'),
       db.getMeta('doubleEntry'),
+      db.getMeta<boolean>('darkMode'),
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('defaultAccountId'),
       db.getMeta<string>('defaultBudgetId')
-    ]).then(([curr, de, accs, buds, defAccId, defBudId]) => {
+    ]).then(([curr, de, dark, accs, buds, defAccId, defBudId]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
+        setDarkMode(dark || false)
         setAccounts(accs)
         setBudgets(buds)
         setDefaultAccountId(defAccId || '')
@@ -47,6 +50,12 @@ export default function SettingsPage() {
     await db.setMeta('defaultAccountId', defaultAccountId)
     await db.setMeta('defaultBudgetId', defaultBudgetId)
     alert('Default settings saved!')
+  }
+
+  async function saveDarkMode(){
+    await db.setMeta('darkMode', darkMode)
+    document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+    alert('Theme saved!')
   }
 
   async function doExport(){
@@ -146,6 +155,25 @@ export default function SettingsPage() {
           <span style={{fontWeight: 500}}>Enable Double-Entry Mode</span>
         </label>
         <button onClick={saveDoubleEntry} className="button-primary">💾 Save Transaction Mode</button>
+      </div>
+
+      <div className="card" style={{marginBottom: 20}}>
+        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>🌓</span> Appearance
+        </h3>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+          Choose between light and dark theme for the interface.
+        </p>
+        <label style={{display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 12}}>
+          <input 
+            type="checkbox" 
+            checked={darkMode} 
+            onChange={(e) => setDarkMode(e.target.checked)}
+            style={{width: 20, height: 20, cursor: 'pointer'}}
+          />
+          <span style={{fontWeight: 500}}>Enable Dark Mode</span>
+        </label>
+        <button onClick={saveDarkMode} className="button-primary">💾 Save Theme</button>
       </div>
 
       <div className="card" style={{marginBottom: 20}}>

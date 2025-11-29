@@ -9,6 +9,7 @@ export default function TransactionsPage() {
   const [desc, setDesc] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0,10))
   const [budgetId, setBudgetId] = useState('')
+  const [tagsInput, setTagsInput] = useState('')
   const [lineA, setLineA] = useState<{accountId?:string;amount?:number}>({})
   const [lineB, setLineB] = useState<{accountId?:string;amount?:number}>({})
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -17,6 +18,13 @@ export default function TransactionsPage() {
   const [doubleEntry, setDoubleEntry] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAccount, setFilterAccount] = useState('')
+  const [filterTag, setFilterTag] = useState('')
+  
+  // Transfer state
+  const [transferFrom, setTransferFrom] = useState('')
+  const [transferTo, setTransferTo] = useState('')
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferDesc, setTransferDesc] = useState('')
 
 
   useEffect(() => {
@@ -58,13 +66,26 @@ export default function TransactionsPage() {
     return budgets.find(b => b.id === budgetId)
   }
 
+  // Get all unique tags from transactions
+  const getAllTags = (): string[] => {
+    const tagSet = new Set<string>()
+    items.forEach(t => {
+      if (t.tags) {
+        t.tags.forEach(tag => tagSet.add(tag))
+      }
+    })
+    return Array.from(tagSet).sort()
+  }
+
   const filteredItems = items.filter(t => {
     const matchesSearch = !searchTerm || 
       t.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.date.includes(searchTerm)
     const matchesAccount = !filterAccount ||
       t.lines.some(l => l.accountId === filterAccount)
-    return matchesSearch && matchesAccount
+    const matchesTag = !filterTag ||
+      (t.tags && t.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase())))
+    return matchesSearch && matchesAccount && matchesTag
   })
 
   async function create() {
@@ -89,6 +110,7 @@ export default function TransactionsPage() {
         date,
         description: desc,
         budgetId: budgetId || undefined,
+        tags: tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : undefined,
         lines: [
           { accountId: lineA.accountId!, amount: aAmt },
           { accountId: lineB.accountId!, amount: bAmt }
@@ -105,6 +127,7 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setBudgetId('')
+        setTagsInput('')
         setLineA({})
         setLineB({})
       } catch (e: any) {
@@ -117,6 +140,7 @@ export default function TransactionsPage() {
         date,
         description: desc,
         budgetId: budgetId || undefined,
+        tags: tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : undefined,
         lines: [
           { accountId: lineA.accountId!, amount: aAmt }
         ]
@@ -148,6 +172,7 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setBudgetId('')
+        setTagsInput('')
         setLineA({})
         setLineB({})
       } catch (e: any) {
@@ -163,6 +188,7 @@ export default function TransactionsPage() {
     setDesc(tx.description || '')
     setDate(tx.date)
     setBudgetId(tx.budgetId || '')
+    setTagsInput(tx.tags ? tx.tags.join(', ') : '')
     setLineA({ accountId: tx.lines[0]?.accountId, amount: tx.lines[0]?.amount })
     if (doubleEntry && tx.lines[1]) {
       setLineB({ accountId: tx.lines[1]?.accountId, amount: tx.lines[1]?.amount })
@@ -190,6 +216,63 @@ export default function TransactionsPage() {
     setItems(await db.getAll('transactions'))
   }
 
+  async function quickTransfer() {
+    if (!transferFrom || !transferTo || !transferAmount) {
+      alert('Please fill in all transfer fields')
+      return
+    }
+    
+    if (transferFrom === transferTo) {
+      alert('Cannot transfer to the same account')
+      return
+    }
+    
+    const amount = Number(transferAmount)
+    if (amount <= 0) {
+      alert('Transfer amount must be positive')
+      return
+    }
+    
+    const tx: Transaction = {
+      id: `tx:${Date.now()}`,
+      date,
+      description: transferDesc || `Transfer from ${getAccountName(transferFrom)} to ${getAccountName(transferTo)}`,
+      lines: [
+        { accountId: transferFrom, amount: -amount },
+        { accountId: transferTo, amount: amount }
+      ]
+    }
+    
+    try {
+      if (doubleEntry) {
+        await db.addTransaction(tx)
+      } else {
+        // In simple mode, still create a transfer as a balanced transaction
+        await db.add('transactions', tx)
+        // Update both account balances
+        const fromAcc = await db.get<Account>('accounts', transferFrom)
+        const toAcc = await db.get<Account>('accounts', transferTo)
+        if (fromAcc) {
+          fromAcc.balance = (fromAcc.balance || 0) - amount
+          await db.put('accounts', fromAcc)
+        }
+        if (toAcc) {
+          toAcc.balance = (toAcc.balance || 0) + amount
+          await db.put('accounts', toAcc)
+        }
+      }
+      
+      setItems(await db.getAll('transactions'))
+      setTransferFrom('')
+      setTransferTo('')
+      setTransferAmount('')
+      setTransferDesc('')
+      alert('✅ Transfer completed successfully!')
+    } catch (e: any) {
+      alert('Transfer failed: ' + e.message)
+    }
+  }
+
   return (
     <div className="page container">
       <h2>💸 Transactions</h2>
@@ -209,6 +292,12 @@ export default function TransactionsPage() {
           <option value="">No budget</option>
           {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
+        <input 
+          value={tagsInput} 
+          onChange={(e)=>setTagsInput(e.target.value)} 
+          placeholder="Tags (comma separated, e.g., food, groceries, shopping)" 
+          style={{marginTop:8}}
+        />
         
         <div style={{display:'flex',gap:8,marginTop:8}}>
           <select onChange={(e)=>setLineA(s=>({...s,accountId:e.target.value}))} value={lineA.accountId||''}>
@@ -236,6 +325,48 @@ export default function TransactionsPage() {
         <button onClick={create} style={{marginTop:8}} className="button-primary">{editingId ? '💾 Update' : '➕ Create'} {doubleEntry ? 'Double-Entry Tx' : 'Transaction'}</button>
       </div>
 
+      <div className="card" style={{marginBottom:12, background: 'linear-gradient(135deg, var(--accent-light), var(--bg-secondary))'}}>
+        <h3 style={{marginTop: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>🔄</span> Quick Transfer Between Accounts
+        </h3>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 12}}>
+          Transfer money from one account to another instantly
+        </p>
+        
+        <div style={{display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center', marginBottom: 8}}>
+          <select value={transferFrom} onChange={(e)=>setTransferFrom(e.target.value)}>
+            <option value="">From account...</option>
+            {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+          <span style={{fontSize: '1.25rem', color: 'var(--accent)'}}>→</span>
+          <select value={transferTo} onChange={(e)=>setTransferTo(e.target.value)}>
+            <option value="">To account...</option>
+            {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
+        
+        <input 
+          type="number" 
+          placeholder="Amount to transfer" 
+          value={transferAmount} 
+          onChange={(e)=>setTransferAmount(e.target.value)}
+          style={{marginBottom: 8}}
+          min="0"
+          step="0.01"
+        />
+        
+        <input 
+          placeholder="Description (optional)" 
+          value={transferDesc} 
+          onChange={(e)=>setTransferDesc(e.target.value)}
+          style={{marginBottom: 8}}
+        />
+        
+        <button onClick={quickTransfer} className="button-success" style={{width: '100%'}}>
+          🔄 Transfer {transferAmount && `${formatCurrency(Number(transferAmount), currency)}`}
+        </button>
+      </div>
+
       <div className="card" style={{marginBottom:12}}>
         <h3 style={{marginTop:0,marginBottom:8}}>🔍 Filter & Search</h3>
         <input 
@@ -244,9 +375,13 @@ export default function TransactionsPage() {
           onChange={(e)=>setSearchTerm(e.target.value)}
           style={{marginBottom:8}}
         />
-        <select value={filterAccount} onChange={(e)=>setFilterAccount(e.target.value)}>
+        <select value={filterAccount} onChange={(e)=>setFilterAccount(e.target.value)} style={{marginBottom:8}}>
           <option value="">All accounts</option>
           {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+        <select value={filterTag} onChange={(e)=>setFilterTag(e.target.value)}>
+          <option value="">All tags</option>
+          {getAllTags().map(tag=> <option key={tag} value={tag}>{tag}</option>)}
         </select>
       </div>
 
@@ -270,6 +405,15 @@ export default function TransactionsPage() {
                     }}
                   >
                     {budget.name}
+                  </span>
+                )}
+                {t.tags && t.tags.length > 0 && (
+                  <span style={{marginLeft:8}}>
+                    {t.tags.map(tag => (
+                      <span key={tag} style={{marginLeft:4,padding:'2px 6px',background:'#e0e7ff',color:'#4f46e5',borderRadius:4,fontSize:'0.7rem',fontWeight:500}}>
+                        🏷️ {tag}
+                      </span>
+                    ))}
                   </span>
                 )}
               </div>
