@@ -120,6 +120,11 @@ Budgets automatically track spending from transactions assigned to them. When cr
 - Red: Over budget
 - Percentage of budget used
 
+### Quick Transaction Defaults
+Save time when creating transactions by setting default values in Settings:
+- **Default Account** — Pre-fills the account field when creating new transactions
+- **Default Budget** — Pre-fills the budget field for automatic categorization
+
 ## PWA Installation
 
 The app includes a `manifest.json` and automatic service worker generation via `vite-plugin-pwa`. To make it fully installable:

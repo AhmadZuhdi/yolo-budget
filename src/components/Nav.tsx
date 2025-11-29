@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
+import packageJson from '../../package.json'
 
 export default function Nav(){
   const [isOpen, setIsOpen] = useState(false)
@@ -50,6 +51,16 @@ export default function Nav(){
           <NavLink to="/settings" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
             <span className="icon">⚙️</span> Settings
           </NavLink>
+        </div>
+        <div className="side-nav-footer">
+          <div className="version-info">
+            <div className="version-label">Version</div>
+            <div className="version-value">v{packageJson.version}</div>
+          </div>
+          <div className="build-info">
+            <div className="build-label">Build</div>
+            <div className="build-value">{packageJson.name}</div>
+          </div>
         </div>
       </nav>
     </>

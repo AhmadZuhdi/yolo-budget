@@ -26,14 +26,23 @@ export default function TransactionsPage() {
       db.getAll<Account>('accounts'),
       db.getMeta<string>('currency'),
       db.getAll<Budget>('budgets'),
-      db.getMeta<boolean>('doubleEntry')
-    ]).then(([transactions, accs, curr, buds, de]) => {
+      db.getMeta<boolean>('doubleEntry'),
+      db.getMeta<string>('defaultAccountId'),
+      db.getMeta<string>('defaultBudgetId')
+    ]).then(([transactions, accs, curr, buds, de, defAccId, defBudId]) => {
       if (mounted) {
         setItems(transactions)
         setAccounts(accs)
         setCurrency(curr || 'USD')
         setBudgets(buds)
         setDoubleEntry(de !== false) // default to true
+        // Apply defaults only if not editing
+        if (!editingId && defAccId) {
+          setLineA(prev => ({ ...prev, accountId: defAccId }))
+        }
+        if (!editingId && defBudId) {
+          setBudgetId(defBudId)
+        }
         setLoading(false)
       }
     })

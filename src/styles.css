@@ -95,6 +95,7 @@ body{
 
 .side-nav-links{
   padding:20px 0;
+  padding-bottom:100px;
 }
 .side-nav-links a{
   display:flex;
@@ -121,6 +122,39 @@ body{
   font-size:1.25rem;
   width:24px;
   text-align:center;
+}
+
+.side-nav-footer{
+  position:absolute;
+  bottom:0;
+  left:0;
+  right:0;
+  padding:16px 24px;
+  background:var(--bg-secondary);
+  border-top:1px solid #e5e7eb;
+  font-size:0.75rem;
+  color:#6b7280;
+}
+.side-nav-footer .version-info,
+.side-nav-footer .build-info{
+  display:flex;
+  justify-content:space-between;
+  margin-bottom:4px;
+}
+.side-nav-footer .version-info:last-child,
+.side-nav-footer .build-info:last-child{
+  margin-bottom:0;
+}
+.side-nav-footer .version-label,
+.side-nav-footer .build-label{
+  font-weight:500;
+  color:#9ca3af;
+}
+.side-nav-footer .version-value,
+.side-nav-footer .build-value{
+  font-weight:600;
+  color:var(--text);
+  font-family:monospace;
 }
 
 /* Menu Overlay */

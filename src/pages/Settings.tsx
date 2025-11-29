@@ -1,20 +1,32 @@
 import React, { useEffect, useState } from 'react'
-import { db } from '../db/indexeddb'
+import { db, Account, Budget } from '../db/indexeddb'
 
-export default function SettingsPage(){
+export default function SettingsPage() {
   const [currency, setCurrency] = useState('USD')
   const [doubleEntry, setDoubleEntry] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [budgets, setBudgets] = useState<Budget[]>([])
+  const [defaultAccountId, setDefaultAccountId] = useState('')
+  const [defaultBudgetId, setDefaultBudgetId] = useState('')
 
   useEffect(()=>{
     let mounted = true
     Promise.all([
       db.getMeta('currency'),
-      db.getMeta('doubleEntry')
-    ]).then(([curr, de]) => {
+      db.getMeta('doubleEntry'),
+      db.getAll<Account>('accounts'),
+      db.getAll<Budget>('budgets'),
+      db.getMeta<string>('defaultAccountId'),
+      db.getMeta<string>('defaultBudgetId')
+    ]).then(([curr, de, accs, buds, defAccId, defBudId]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
+        setAccounts(accs)
+        setBudgets(buds)
+        setDefaultAccountId(defAccId || '')
+        setDefaultBudgetId(defBudId || '')
         setLoading(false)
       }
     })
@@ -29,6 +41,12 @@ export default function SettingsPage(){
   async function saveDoubleEntry(){
     await db.setMeta('doubleEntry', doubleEntry)
     alert('Double-entry mode saved. Refresh the page to apply changes.')
+  }
+
+  async function saveDefaults(){
+    await db.setMeta('defaultAccountId', defaultAccountId)
+    await db.setMeta('defaultBudgetId', defaultBudgetId)
+    alert('Default settings saved!')
   }
 
   async function doExport(){
@@ -128,6 +146,42 @@ export default function SettingsPage(){
           <span style={{fontWeight: 500}}>Enable Double-Entry Mode</span>
         </label>
         <button onClick={saveDoubleEntry} className="button-primary">💾 Save Transaction Mode</button>
+      </div>
+
+      <div className="card" style={{marginBottom: 20}}>
+        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>⚡</span> Quick Transaction Defaults
+        </h3>
+        <p style={{color: '#6b7280', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+          Set default account and budget to pre-fill when creating new transactions.
+        </p>
+        <div style={{marginBottom: 16}}>
+          <label style={{marginBottom: 8}}>Default Account</label>
+          <select 
+            value={defaultAccountId} 
+            onChange={(e) => setDefaultAccountId(e.target.value)}
+            style={{width: '100%'}}
+          >
+            <option value="">-- None --</option>
+            {accounts.map(acc => (
+              <option key={acc.id} value={acc.id}>{acc.name}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{marginBottom: 16}}>
+          <label style={{marginBottom: 8}}>Default Budget</label>
+          <select 
+            value={defaultBudgetId} 
+            onChange={(e) => setDefaultBudgetId(e.target.value)}
+            style={{width: '100%'}}
+          >
+            <option value="">-- None --</option>
+            {budgets.map(bud => (
+              <option key={bud.id} value={bud.id}>{bud.name}</option>
+            ))}
+          </select>
+        </div>
+        <button onClick={saveDefaults} className="button-primary">💾 Save Defaults</button>
       </div>
 
       <div className="card">
