@@ -12,6 +12,7 @@ export default function BudgetsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -123,42 +124,110 @@ export default function BudgetsPage() {
           const isOverBudget = spending > b.amount
           
           return (
-          <li key={b.id}>
-            <div style={{marginBottom: 8}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center', marginBottom: 4}}>
-                <span style={{fontWeight: 500}}>{b.name}</span>
-                <div style={{display:'flex',gap:8}}>
-                  <button onClick={()=>startEdit(b)} className="button-primary">✏️ Edit</button>
-                  <button onClick={()=>remove(b.id)} className="button-danger">🗑️ Delete</button>
+          <li key={b.id} style={{padding:'8px 12px'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:'0.875rem',fontWeight:500,marginBottom:2}}>{b.name}</div>
+                <div style={{fontSize:'0.75rem',color:'#6b7280'}}>
+                  <span style={{color: isOverBudget ? '#ef4444' : '#10b981', fontWeight: 500}}>
+                    {formatCurrency(spending, currency)}
+                  </span>
+                  {' '} of {formatCurrency(b.amount, currency)}
+                  {' '}({percentage.toFixed(0)}%)
                 </div>
               </div>
-              
-              <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: 6}}>
-                <span style={{color: isOverBudget ? '#ef4444' : '#10b981', fontWeight: 500}}>
-                  {formatCurrency(spending, currency)}
-                </span>
-                {' '} of {formatCurrency(b.amount, currency)}
-                {' '} ({percentage.toFixed(0)}%)
-              </div>
-              
-              <div style={{
-                height: 8,
-                background: '#e5e7eb',
-                borderRadius: 4,
-                overflow: 'hidden'
-              }}>
-                <div style={{
-                  width: `${percentage}%`,
-                  height: '100%',
-                  background: isOverBudget ? '#ef4444' : '#10b981',
-                  transition: 'width 0.3s ease'
-                }} />
+              <div style={{position:'relative',flexShrink:0}}>
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setOpenMenuId(openMenuId === b.id ? null : b.id)
+                  }}
+                  style={{padding:'6px 12px',fontSize:'1rem',background:'transparent',border:'none',cursor:'pointer'}}
+                >
+                  ⋮
+                </button>
+                {openMenuId === b.id && (
+                  <>
+                    <div 
+                      style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:998}} 
+                      onClick={() => setOpenMenuId(null)}
+                    />
+                    <div style={{
+                      position:'absolute',
+                      right:0,
+                      top:'100%',
+                      background:'white',
+                      border:'1px solid #e5e7eb',
+                      borderRadius:6,
+                      boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
+                      minWidth:140,
+                      zIndex:999,
+                      overflow:'hidden'
+                    }}>
+                      <button 
+                        onClick={() => {startEdit(b); setOpenMenuId(null)}}
+                        style={{
+                          width:'100%',
+                          padding:'10px 16px',
+                          textAlign:'left',
+                          background:'white',
+                          border:'none',
+                          cursor:'pointer',
+                          fontSize:'0.875rem',
+                          display:'flex',
+                          alignItems:'center',
+                          gap:8
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      >
+                        <span>✏️</span> Edit
+                      </button>
+                      <button 
+                        onClick={() => {remove(b.id); setOpenMenuId(null)}}
+                        style={{
+                          width:'100%',
+                          padding:'10px 16px',
+                          textAlign:'left',
+                          background:'white',
+                          border:'none',
+                          cursor:'pointer',
+                          fontSize:'0.875rem',
+                          color:'#ef4444',
+                          display:'flex',
+                          alignItems:'center',
+                          gap:8,
+                          borderTop:'1px solid #f3f4f6'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                      >
+                        <span>🗑️</span> Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
+            
+            <div style={{
+              height: 6,
+              background: '#e5e7eb',
+              borderRadius: 3,
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${percentage}%`,
+                background: isOverBudget ? '#ef4444' : '#10b981',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
           </li>
-        )})}  
+        )
+        })}
       </ul>
-      
+
       {items.length === 0 && (
         <div className="card" style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>
           📊 No budgets yet. Create one above!

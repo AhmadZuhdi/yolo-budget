@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { db, RecurringTransaction, Account } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
 
 export default function RecurringTransactionsPage() {
+  const location = useLocation()
   const [items, setItems] = useState<RecurringTransaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
@@ -16,35 +18,56 @@ export default function RecurringTransactionsPage() {
   const [lineA, setLineA] = useState<{accountId?: string; amount?: number}>({})
   const [lineB, setLineB] = useState<{accountId?: string; amount?: number}>({})
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [doubleEntry, setDoubleEntry] = useState(true)
 
   useEffect(() => {
     loadData()
+    
+    // Pre-fill form if coming from transaction conversion
+    const state = location.state as any
+    if (state?.fromTransaction) {
+      const { description: desc, lines } = state.fromTransaction
+      setDescription(desc || '')
+      if (lines && lines.length >= 2) {
+        setLineA({ accountId: lines[0].accountId, amount: lines[0].amount })
+        setLineB({ accountId: lines[1].accountId, amount: lines[1].amount })
+      }
+    }
   }, [])
 
   async function loadData() {
-    const [recurring, accs, curr] = await Promise.all([
+    const [recurring, accs, curr, mode] = await Promise.all([
       db.getAll<RecurringTransaction>('recurringTransactions'),
       db.getAll<Account>('accounts'),
-      db.getMeta<string>('currency')
+      db.getMeta<string>('currency'),
+      db.getMeta<boolean>('doubleEntry')
     ])
     setItems(recurring)
     setAccounts(accs)
     setCurrency(curr || 'USD')
+    setDoubleEntry(mode !== false)
     setLoading(false)
   }
 
   async function create() {
-    if (!description || !lineA.accountId || !lineB.accountId) {
-      alert('Please fill all fields')
+    if (!description || !lineA.accountId) {
+      alert('Please fill all required fields')
       return
     }
 
     const aAmt = Number(lineA.amount || 0)
-    const bAmt = Number(lineB.amount || 0)
     
-    if (Math.abs(aAmt + bAmt) > 1e-6) {
-      alert('Transaction must balance (sum of lines = 0)')
-      return
+    if (doubleEntry) {
+      if (!lineB.accountId) {
+        alert('Please select second account for double-entry mode')
+        return
+      }
+      const bAmt = Number(lineB.amount || 0)
+      if (Math.abs(aAmt + bAmt) > 1e-6) {
+        alert('Transaction must balance (sum of lines = 0)')
+        return
+      }
     }
 
     const recurring: RecurringTransaction = {
@@ -53,10 +76,12 @@ export default function RecurringTransactionsPage() {
       frequency,
       startDate,
       endDate: endDate || undefined,
-      lines: [
-        { accountId: lineA.accountId!, amount: aAmt },
-        { accountId: lineB.accountId!, amount: bAmt }
-      ],
+      lines: doubleEntry && lineB.accountId
+        ? [
+            { accountId: lineA.accountId!, amount: aAmt },
+            { accountId: lineB.accountId!, amount: Number(lineB.amount || 0) }
+          ]
+        : [{ accountId: lineA.accountId!, amount: aAmt }],
       active: true
     }
 
@@ -82,7 +107,9 @@ export default function RecurringTransactionsPage() {
     setStartDate(r.startDate)
     setEndDate(r.endDate || '')
     setLineA({ accountId: r.lines[0]?.accountId, amount: r.lines[0]?.amount })
-    setLineB({ accountId: r.lines[1]?.accountId, amount: r.lines[1]?.amount })
+    if (r.lines[1]) {
+      setLineB({ accountId: r.lines[1]?.accountId, amount: r.lines[1]?.amount })
+    }
   }
 
   async function toggleActive(id: string) {
@@ -120,19 +147,21 @@ export default function RecurringTransactionsPage() {
       ) : (
         <>
           <div className="card" style={{marginBottom: 12}}>
-            <h3 style={{marginTop: 0, marginBottom: 12}}>
+            <h3 style={{marginTop: 0, marginBottom: 12, fontSize: '1rem'}}>
               {editingId ? '✏️ Edit' : '➕ Create'} Recurring Transaction
+              {!doubleEntry && <span style={{marginLeft: 8, fontSize: '0.75rem', color: '#6b7280', display: 'inline-block'}}>(Simple Mode)</span>}
+              {doubleEntry && <span style={{marginLeft: 8, fontSize: '0.75rem', color: '#6b7280', display: 'inline-block'}}>(Double-Entry)</span>}
             </h3>
             
             <input 
               placeholder="Description" 
               value={description} 
               onChange={(e) => setDescription(e.target.value)}
-              style={{marginBottom: 8}}
+              style={{marginBottom: 8, width: '100%'}}
             />
             
-            <div style={{display: 'flex', gap: 8, marginBottom: 8}}>
-              <select value={frequency} onChange={(e) => setFrequency(e.target.value as any)}>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 8}}>
+              <select value={frequency} onChange={(e) => setFrequency(e.target.value as any)} style={{width: '100%'}}>
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
                 <option value="monthly">Monthly</option>
@@ -144,6 +173,7 @@ export default function RecurringTransactionsPage() {
                 value={startDate} 
                 onChange={(e) => setStartDate(e.target.value)}
                 placeholder="Start date"
+                style={{width: '100%'}}
               />
               
               <input 
@@ -151,17 +181,19 @@ export default function RecurringTransactionsPage() {
                 value={endDate} 
                 onChange={(e) => setEndDate(e.target.value)}
                 placeholder="End date (optional)"
+                style={{width: '100%'}}
               />
             </div>
 
             <div style={{marginBottom: 8}}>
-              <label style={{display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: 4}}>
-                Line 1 (Debit)
+              <label style={{display: 'block', fontSize: '0.75rem', color: '#6b7280', marginBottom: 4}}>
+                {doubleEntry ? 'Line 1 (Debit)' : 'Account & Amount'}
               </label>
-              <div style={{display: 'flex', gap: 8}}>
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8}}>
                 <select 
                   onChange={(e) => setLineA(s => ({...s, accountId: e.target.value}))} 
                   value={lineA.accountId || ''}
+                  style={{width: '100%'}}
                 >
                   <option value="">Select account</option>
                   {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
@@ -170,58 +202,62 @@ export default function RecurringTransactionsPage() {
                   placeholder="Amount" 
                   type="number" 
                   value={lineA.amount || ''} 
-                  onChange={(e) => setLineA(s => ({...s, amount: Number(e.target.value)}))} 
+                  onChange={(e) => setLineA(s => ({...s, amount: Number(e.target.value)}))}
+                  style={{width: '100%'}}
                 />
               </div>
             </div>
 
-            <div style={{marginBottom: 12}}>
-              <label style={{display: 'block', fontSize: '0.875rem', color: '#6b7280', marginBottom: 4}}>
-                Line 2 (Credit)
-              </label>
-              <div style={{display: 'flex', gap: 8}}>
-                <select 
-                  onChange={(e) => setLineB(s => ({...s, accountId: e.target.value}))} 
-                  value={lineB.accountId || ''}
-                >
-                  <option value="">Select account</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-                <input 
-                  placeholder="Amount (negative)" 
-                  type="number" 
-                  value={lineB.amount || ''} 
-                  onChange={(e) => setLineB(s => ({...s, amount: Number(e.target.value)}))} 
-                />
+            {doubleEntry && (
+              <div style={{marginBottom: 12}}>
+                <label style={{display: 'block', fontSize: '0.75rem', color: '#6b7280', marginBottom: 4}}>
+                  Line 2 (Credit)
+                </label>
+                <div style={{display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8}}>
+                  <select 
+                    onChange={(e) => setLineB(s => ({...s, accountId: e.target.value}))} 
+                    value={lineB.accountId || ''}
+                    style={{width: '100%'}}
+                  >
+                    <option value="">Select account</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                  <input 
+                    placeholder="Amount" 
+                    type="number" 
+                    value={lineB.amount || ''} 
+                    onChange={(e) => setLineB(s => ({...s, amount: Number(e.target.value)}))}
+                    style={{width: '100%'}}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div style={{display: 'flex', gap: 8}}>
-              <button onClick={create} className="button-primary">{editingId ? '💾 Update' : '➕ Create'}</button>
-              {editingId && <button onClick={resetForm} className="button-secondary">❌ Cancel</button>}
+            <div style={{display: 'flex', gap: 8, flexWrap: 'wrap'}}>
+              <button onClick={create} className="button-primary" style={{flex: '1', minWidth: '120px'}}>{editingId ? '💾 Update' : '➕ Create'}</button>
+              {editingId && <button onClick={resetForm} className="button-secondary" style={{flex: '1', minWidth: '120px'}}>❌ Cancel</button>}
             </div>
           </div>
 
-          <div style={{marginBottom: 12, textAlign: 'right'}}>
-            <button onClick={processNow} className="button-success">
+          <div style={{marginBottom: 12}}>
+            <button onClick={processNow} className="button-success" style={{width: '100%'}}>
               ▶️ Process Due Transactions Now
             </button>
           </div>
 
           <ul className="list">
             {items.map((r) => (
-              <li key={r.id} style={{opacity: r.active ? 1 : 0.5}}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'start'}}>
-                  <div style={{flex: 1}}>
-                    <div style={{fontWeight: 500, marginBottom: 4}}>
+              <li key={r.id} style={{padding:'8px 12px',opacity: r.active ? 1 : 0.5}}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <div style={{flex: 1, minWidth: 0}}>
+                    <div style={{fontSize:'0.875rem',fontWeight:500,marginBottom:2}}>
                       {r.description}
-                      {!r.active && <span style={{color: '#ef4444', marginLeft: 8}}>(Inactive)</span>}
+                      {!r.active && <span style={{color: '#ef4444', marginLeft: 8, fontSize:'0.75rem'}}>(Inactive)</span>}
                     </div>
-                    <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                      <div>Frequency: {r.frequency}</div>
-                      <div>Start: {r.startDate} {r.endDate && `• End: ${r.endDate}`}</div>
-                      {r.lastProcessed && <div>Last processed: {r.lastProcessed}</div>}
-                      <div style={{marginTop: 4}}>
+                    <div style={{fontSize: '0.75rem', color: '#6b7280'}}>
+                      <div>{r.frequency} • Start: {r.startDate} {r.endDate && `• End: ${r.endDate}`}</div>
+                      {r.lastProcessed && <div>Last: {r.lastProcessed}</div>}
+                      <div style={{marginTop: 2}}>
                         {r.lines.map((l, i) => (
                           <span key={i} style={{marginRight: 12}}>
                             {getAccountName(l.accountId)}: {formatCurrency(l.amount, currency)}
@@ -230,12 +266,96 @@ export default function RecurringTransactionsPage() {
                       </div>
                     </div>
                   </div>
-                  <div style={{display: 'flex', gap: 8, flexShrink: 0}}>
-                    <button onClick={() => toggleActive(r.id)} className="button-secondary">
-                      {r.active ? '⏸️ Pause' : '▶️ Activate'}
+                  <div style={{position:'relative',flexShrink:0}}>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOpenMenuId(openMenuId === r.id ? null : r.id)
+                      }}
+                      style={{padding:'6px 12px',fontSize:'1rem',background:'transparent',border:'none',cursor:'pointer'}}
+                    >
+                      ⋮
                     </button>
-                    <button onClick={() => startEdit(r)} className="button-primary">✏️ Edit</button>
-                    <button onClick={() => remove(r.id)} className="button-danger">🗑️ Delete</button>
+                    {openMenuId === r.id && (
+                      <>
+                        <div 
+                          style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:998}} 
+                          onClick={() => setOpenMenuId(null)}
+                        />
+                        <div style={{
+                          position:'absolute',
+                          right:0,
+                          top:'100%',
+                          background:'white',
+                          border:'1px solid #e5e7eb',
+                          borderRadius:6,
+                          boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
+                          minWidth:160,
+                          zIndex:999,
+                          overflow:'hidden'
+                        }}>
+                          <button 
+                            onClick={() => {toggleActive(r.id); setOpenMenuId(null)}}
+                            style={{
+                              width:'100%',
+                              padding:'10px 16px',
+                              textAlign:'left',
+                              background:'white',
+                              border:'none',
+                              cursor:'pointer',
+                              fontSize:'0.875rem',
+                              display:'flex',
+                              alignItems:'center',
+                              gap:8
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                          >
+                            <span>{r.active ? '⏸️' : '▶️'}</span> {r.active ? 'Pause' : 'Activate'}
+                          </button>
+                          <button 
+                            onClick={() => {startEdit(r); setOpenMenuId(null)}}
+                            style={{
+                              width:'100%',
+                              padding:'10px 16px',
+                              textAlign:'left',
+                              background:'white',
+                              border:'none',
+                              cursor:'pointer',
+                              fontSize:'0.875rem',
+                              display:'flex',
+                              alignItems:'center',
+                              gap:8
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                          >
+                            <span>✏️</span> Edit
+                          </button>
+                          <button 
+                            onClick={() => {remove(r.id); setOpenMenuId(null)}}
+                            style={{
+                              width:'100%',
+                              padding:'10px 16px',
+                              textAlign:'left',
+                              background:'white',
+                              border:'none',
+                              cursor:'pointer',
+                              fontSize:'0.875rem',
+                              color:'#ef4444',
+                              display:'flex',
+                              alignItems:'center',
+                              gap:8,
+                              borderTop:'1px solid #f3f4f6'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                          >
+                            <span>🗑️</span> Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </li>

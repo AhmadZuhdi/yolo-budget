@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { db, Transaction, TransactionLine, Account, Budget } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
 
 export default function TransactionsPage() {
+  const navigate = useNavigate()
   const [items, setItems] = useState<Transaction[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -24,6 +26,7 @@ export default function TransactionsPage() {
   const [showCreateForm, setShowCreateForm] = useState(true)
   const [showTransfer, setShowTransfer] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   
   // Transfer state
   const [transferFrom, setTransferFrom] = useState('')
@@ -281,6 +284,19 @@ export default function TransactionsPage() {
     }
   }
 
+  function convertToRecurring(transaction: Transaction) {
+    // Navigate to recurring page with transaction data in state
+    navigate('/recurring', { 
+      state: { 
+        fromTransaction: {
+          description: transaction.description,
+          lines: transaction.lines,
+          budgetId: transaction.budgetId
+        }
+      }
+    })
+  }
+
   return (
     <div className="page container">
       <h2>💸 Transactions</h2>
@@ -457,9 +473,96 @@ export default function TransactionsPage() {
                 ))}
               </div>
             </div>
-            <div style={{display:'flex',gap:4,flexShrink:0}}>
-              <button onClick={()=>startEdit(t.id)} className="button-primary" style={{padding:'6px 12px',fontSize:'0.8rem'}}>✏️</button>
-              <button onClick={()=>remove(t.id)} className="button-danger" style={{padding:'6px 12px',fontSize:'0.8rem'}}>🗑️</button>
+            <div style={{position: 'relative', flexShrink:0}}>
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setOpenMenuId(openMenuId === t.id ? null : t.id)
+                }}
+                style={{padding:'6px 12px',fontSize:'1rem',background:'transparent',border:'none',cursor:'pointer'}}
+              >
+                ⋮
+              </button>
+              {openMenuId === t.id && (
+                <>
+                  <div 
+                    style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:998}} 
+                    onClick={() => setOpenMenuId(null)}
+                  />
+                  <div style={{
+                    position:'absolute',
+                    right:0,
+                    top:'100%',
+                    background:'white',
+                    border:'1px solid #e5e7eb',
+                    borderRadius:6,
+                    boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
+                    minWidth:160,
+                    zIndex:999,
+                    overflow:'hidden'
+                  }}>
+                    <button 
+                      onClick={() => {convertToRecurring(t); setOpenMenuId(null)}}
+                      style={{
+                        width:'100%',
+                        padding:'10px 16px',
+                        textAlign:'left',
+                        background:'white',
+                        border:'none',
+                        cursor:'pointer',
+                        fontSize:'0.875rem',
+                        display:'flex',
+                        alignItems:'center',
+                        gap:8
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span>🔁</span> Convert to Recurring
+                    </button>
+                    <button 
+                      onClick={() => {startEdit(t.id); setOpenMenuId(null)}}
+                      style={{
+                        width:'100%',
+                        padding:'10px 16px',
+                        textAlign:'left',
+                        background:'white',
+                        border:'none',
+                        cursor:'pointer',
+                        fontSize:'0.875rem',
+                        display:'flex',
+                        alignItems:'center',
+                        gap:8
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span>✏️</span> Edit
+                    </button>
+                    <button 
+                      onClick={() => {remove(t.id); setOpenMenuId(null)}}
+                      style={{
+                        width:'100%',
+                        padding:'10px 16px',
+                        textAlign:'left',
+                        background:'white',
+                        border:'none',
+                        cursor:'pointer',
+                        fontSize:'0.875rem',
+                        color:'#ef4444',
+                        display:'flex',
+                        alignItems:'center',
+                        gap:8,
+                        borderTop:'1px solid #f3f4f6'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                    >
+                      <span>🗑️</span> Delete
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </li>
         )

@@ -11,6 +11,7 @@ export default function AccountsPage() {
   const [editType, setEditType] = useState<Account['type']>('bank')
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
 
   useEffect(() => {
     let mounted = true
@@ -107,8 +108,8 @@ export default function AccountsPage() {
         ) : (
       <ul className="list">
         {items.map((a) => (
-          <li key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center', padding: '16px 0'}}>
-            <div style={{flex: 1}}>
+          <li key={a.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px'}}>
+            <div style={{flex:1,minWidth:0}}>
               {editingId === a.id ? (
                 <div style={{display: 'grid', gap: 8}}>
                   <input value={editName} onChange={(e)=>setEditName(e.target.value)} placeholder="Account name" />
@@ -121,23 +122,96 @@ export default function AccountsPage() {
                 </div>
               ) : (
                 <div>
-                  <div style={{fontWeight: 600, fontSize: '1rem', marginBottom: 4}}>{a.name}</div>
-                  <div style={{fontSize: '0.875rem', color: '#6b7280'}}>
-                    {a.type.charAt(0).toUpperCase() + a.type.slice(1)} • {formatCurrency(a.balance ?? 0, currency)}
+                  <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2}}>
+                    <span style={{fontSize:'0.875rem',fontWeight:500}}>{a.name}</span>
+                    <span style={{padding:'1px 6px',borderRadius:3,fontSize:'0.7rem',background:'#e0e7ff',color:'#4f46e5'}}>
+                      {a.type}
+                    </span>
+                  </div>
+                  <div style={{fontSize:'0.75rem',color:'#6b7280'}}>
+                    {formatCurrency(a.balance ?? 0, currency)}
                   </div>
                 </div>
               )}
             </div>
-            <div style={{display:'flex',gap:8, flexShrink: 0}}>
+            <div style={{position:'relative',flexShrink:0}}>
               {editingId === a.id ? (
-                <>
-                  <button onClick={saveEdit} style={{background: '#10b981'}}>✓ Save</button>
-                  <button onClick={()=>setEditingId(null)} style={{background: '#6b7280'}}>✗ Cancel</button>
-                </>
+                <div style={{display:'flex',gap:4}}>
+                  <button onClick={saveEdit} style={{padding:'6px 12px',fontSize:'0.8rem',background:'#10b981',color:'white',border:'none',borderRadius:4,cursor:'pointer'}}>✓</button>
+                  <button onClick={()=>setEditingId(null)} style={{padding:'6px 12px',fontSize:'0.8rem',background:'#6b7280',color:'white',border:'none',borderRadius:4,cursor:'pointer'}}>✗</button>
+                </div>
               ) : (
                 <>
-                  <button onClick={()=>startEdit(a)} style={{background: '#3b82f6'}}>✏️ Edit</button>
-                  <button onClick={()=>remove(a.id)} style={{background: '#ef4444'}}>🗑️ Delete</button>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setOpenMenuId(openMenuId === a.id ? null : a.id)
+                    }}
+                    style={{padding:'6px 12px',fontSize:'1rem',background:'transparent',border:'none',cursor:'pointer'}}
+                  >
+                    ⋮
+                  </button>
+                  {openMenuId === a.id && (
+                    <>
+                      <div 
+                        style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:998}} 
+                        onClick={() => setOpenMenuId(null)}
+                      />
+                      <div style={{
+                        position:'absolute',
+                        right:0,
+                        top:'100%',
+                        background:'white',
+                        border:'1px solid #e5e7eb',
+                        borderRadius:6,
+                        boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
+                        minWidth:140,
+                        zIndex:999,
+                        overflow:'hidden'
+                      }}>
+                        <button 
+                          onClick={() => {startEdit(a); setOpenMenuId(null)}}
+                          style={{
+                            width:'100%',
+                            padding:'10px 16px',
+                            textAlign:'left',
+                            background:'white',
+                            border:'none',
+                            cursor:'pointer',
+                            fontSize:'0.875rem',
+                            display:'flex',
+                            alignItems:'center',
+                            gap:8
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                          <span>✏️</span> Edit
+                        </button>
+                        <button 
+                          onClick={() => {remove(a.id); setOpenMenuId(null)}}
+                          style={{
+                            width:'100%',
+                            padding:'10px 16px',
+                            textAlign:'left',
+                            background:'white',
+                            border:'none',
+                            cursor:'pointer',
+                            fontSize:'0.875rem',
+                            color:'#ef4444',
+                            display:'flex',
+                            alignItems:'center',
+                            gap:8,
+                            borderTop:'1px solid #f3f4f6'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                        >
+                          <span>🗑️</span> Delete
+                        </button>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
             </div>

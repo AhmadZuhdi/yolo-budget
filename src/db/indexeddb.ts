@@ -185,6 +185,8 @@ export const db = {
   async processRecurringTransactions() {
     const recurring = await this.getAll<RecurringTransaction>('recurringTransactions')
     const today = new Date().toISOString().slice(0, 10)
+    const doubleEntry = await this.getMeta<boolean>('doubleEntry')
+    const isDoubleEntry = doubleEntry !== false
     
     for (const r of recurring) {
       if (!r.active) continue
@@ -200,7 +202,19 @@ export const db = {
           lines: r.lines
         }
         
-        await this.addTransaction(tx)
+        if (isDoubleEntry) {
+          await this.addTransaction(tx)
+        } else {
+          // Simple mode: add transaction and update account balance
+          await this.add('transactions', tx)
+          if (tx.lines[0]) {
+            const acc = await this.get<Account>('accounts', tx.lines[0].accountId)
+            if (acc) {
+              acc.balance = (acc.balance || 0) + tx.lines[0].amount
+              await this.put('accounts', acc)
+            }
+          }
+        }
         
         // Update last processed date
         r.lastProcessed = today
