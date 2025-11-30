@@ -11,6 +11,9 @@ export default function DashboardPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
+  const [showCharts, setShowCharts] = useState(false)
+  const [showRecent, setShowRecent] = useState(false)
+  const [showBalance, setShowBalance] = useState(false)
   
   useEffect(() => {
     let mounted = true
@@ -70,65 +73,91 @@ export default function DashboardPage() {
         <div className="card" style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>Loading dashboard...</div>
       ) : (
         <>
-          {/* Summary Cards */}
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, marginBottom: 12}}>
-            <div className="card">
-              <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: 4}}>Total Balance</div>
-              <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#0ea5a4'}}>
-                {formatCurrency(totalBalance, currency)}
+          {/* Summary Card - Single Line */}
+          <div className="card" style={{marginBottom: 12, padding: '12px 16px'}}>
+            <div style={{display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap'}}>
+              <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                <span style={{fontSize: '0.8rem', color: '#6b7280'}}>Balance:</span>
+                <span 
+                  style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#0ea5a4', cursor: 'pointer', userSelect: 'none'}}
+                  onClick={() => setShowBalance(!showBalance)}
+                >
+                  {showBalance ? formatCurrency(totalBalance, currency) : '••••••'}
+                </span>
               </div>
-            </div>
-            <div className="card">
-              <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: 4}}>Accounts</div>
-              <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#3b82f6'}}>{accounts.length}</div>
-            </div>
-            <div className="card">
-              <div style={{fontSize: '0.875rem', color: '#6b7280', marginBottom: 4}}>Transactions</div>
-              <div style={{fontSize: '1.5rem', fontWeight: 'bold', color: '#10b981'}}>{tx.length}</div>
+              <div style={{height: 20, width: 1, backgroundColor: '#e5e7eb'}}></div>
+              <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                <span style={{fontSize: '0.8rem', color: '#6b7280'}}>Accounts:</span>
+                <span style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#3b82f6'}}>{accounts.length}</span>
+              </div>
+              <div style={{height: 20, width: 1, backgroundColor: '#e5e7eb'}}></div>
+              <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+                <span style={{fontSize: '0.8rem', color: '#6b7280'}}>Transactions:</span>
+                <span style={{fontSize: '1.2rem', fontWeight: 'bold', color: '#10b981'}}>{tx.length}</span>
+              </div>
             </div>
           </div>
 
           {/* Charts */}
-          <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12, marginBottom: 12}}>
-            <section className="card">
-              <h3 style={{marginTop: 0}}>Transaction History</h3>
-              <div className="chart">
-                {labels.length > 0 ? (
-                  <Bar data={data} />
-                ) : (
-                  <div style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>No transactions yet</div>
-                )}
-              </div>
-            </section>
+          <div className="card" style={{marginBottom: 12}}>
+            <h3 
+              style={{marginTop: 0, marginBottom: showCharts ? 12 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
+              onClick={() => setShowCharts(!showCharts)}
+            >
+              <span>📊 Charts</span>
+              <span style={{fontSize: '1.2rem'}}>{showCharts ? '▼' : '▶'}</span>
+            </h3>
+            {showCharts && (
+              <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 12}}>
+                <section>
+                  <h4 style={{marginTop: 0, fontSize: '1rem'}}>Transaction History</h4>
+                  <div className="chart">
+                    {labels.length > 0 ? (
+                      <Bar data={data} />
+                    ) : (
+                      <div style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>No transactions yet</div>
+                    )}
+                  </div>
+                </section>
 
-            <section className="card">
-              <h3 style={{marginTop: 0}}>Account Distribution</h3>
-              <div style={{maxWidth: 250, margin: '0 auto', padding: '20px 0'}}>
-                {accounts.filter(a => (a.balance || 0) > 0).length > 0 ? (
-                  <Pie data={accountData} />
-                ) : (
-                  <div style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>No account balances</div>
-                )}
+                <section>
+                  <h4 style={{marginTop: 0, fontSize: '1rem'}}>Account Distribution</h4>
+                  <div style={{maxWidth: 250, margin: '0 auto', padding: '20px 0'}}>
+                    {accounts.filter(a => (a.balance || 0) > 0).length > 0 ? (
+                      <Pie data={accountData} />
+                    ) : (
+                      <div style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>No account balances</div>
+                    )}
+                  </div>
+                </section>
               </div>
-            </section>
+            )}
           </div>
 
           {/* Recent Transactions */}
           <section className="card">
-            <h3 style={{marginTop: 0, marginBottom: 12}}>Recent Transactions</h3>
-            {recentTx.length > 0 ? (
-              <ul className="list">
-                {recentTx.map((t) => (
-                  <li key={t.id} style={{padding: '8px 0', borderBottom: '1px solid #f3f4f6'}}>
-                    <div style={{display: 'flex', justifyContent: 'space-between'}}>
-                      <span style={{fontWeight: 500}}>{t.description || 'No description'}</span>
-                      <span style={{fontSize: '0.875rem', color: '#6b7280'}}>{t.date}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No recent transactions</div>
+            <h3 
+              style={{marginTop: 0, marginBottom: showRecent ? 12 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
+              onClick={() => setShowRecent(!showRecent)}
+            >
+              <span>🕒 Recent Transactions</span>
+              <span style={{fontSize: '1.2rem'}}>{showRecent ? '▼' : '▶'}</span>
+            </h3>
+            {showRecent && (
+              recentTx.length > 0 ? (
+                <ul className="list">
+                  {recentTx.map((t) => (
+                    <li key={t.id} style={{padding: '8px 0', borderBottom: '1px solid #f3f4f6'}}>
+                      <div style={{display: 'flex', justifyContent: 'space-between'}}>
+                        <span style={{fontWeight: 500}}>{t.description || 'No description'}</span>
+                        <span style={{fontSize: '0.875rem', color: '#6b7280'}}>{t.date}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No recent transactions</div>
+              )
             )}
           </section>
         </>

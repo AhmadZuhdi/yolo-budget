@@ -20,6 +20,11 @@ export default function TransactionsPage() {
   const [filterAccount, setFilterAccount] = useState('')
   const [filterTag, setFilterTag] = useState('')
   
+  // Collapsible sections state
+  const [showCreateForm, setShowCreateForm] = useState(true)
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
+  
   // Transfer state
   const [transferFrom, setTransferFrom] = useState('')
   const [transferTo, setTransferTo] = useState('')
@@ -86,6 +91,9 @@ export default function TransactionsPage() {
     const matchesTag = !filterTag ||
       (t.tags && t.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase())))
     return matchesSearch && matchesAccount && matchesTag
+  }).sort((a, b) => {
+    // Sort by date descending (newest first)
+    return b.date.localeCompare(a.date) || b.id.localeCompare(a.id)
   })
 
   async function create() {
@@ -281,11 +289,19 @@ export default function TransactionsPage() {
       ) : (
         <>
       <div className="card" style={{marginBottom:12}}>
-        <h3 style={{marginTop: 0, marginBottom: 12}}>
-          {editingId ? '✏️ Edit' : '➕ Create'} Transaction
-          {!doubleEntry && <span style={{marginLeft: 8, fontSize: '0.875rem', color: '#6b7280'}}>(Simple Mode)</span>}
-          {doubleEntry && <span style={{marginLeft: 8, fontSize: '0.875rem', color: '#6b7280'}}>(Double-Entry)</span>}
+        <h3 
+          style={{marginTop: 0, marginBottom: showCreateForm ? 12 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
+          onClick={() => setShowCreateForm(!showCreateForm)}
+        >
+          <span>
+            {editingId ? '✏️ Edit' : '➕ Create'} Transaction
+            {!doubleEntry && <span style={{marginLeft: 8, fontSize: '0.875rem', color: '#6b7280'}}>(Simple Mode)</span>}
+            {doubleEntry && <span style={{marginLeft: 8, fontSize: '0.875rem', color: '#6b7280'}}>(Double-Entry)</span>}
+          </span>
+          <span style={{fontSize: '1.2rem'}}>{showCreateForm ? '▼' : '▶'}</span>
         </h3>
+        {showCreateForm && (
+          <>
         <input value={desc} onChange={(e)=>setDesc(e.target.value)} placeholder="Description" />
         <input type="date" value={date} onChange={(e)=>setDate(e.target.value)} />
         <select value={budgetId} onChange={(e)=>setBudgetId(e.target.value)} style={{marginTop:8}}>
@@ -297,7 +313,13 @@ export default function TransactionsPage() {
           onChange={(e)=>setTagsInput(e.target.value)} 
           placeholder="Tags (comma separated, e.g., food, groceries, shopping)" 
           style={{marginTop:8}}
+          list="tags-datalist"
         />
+        <datalist id="tags-datalist">
+          {getAllTags().map(tag => (
+            <option key={tag} value={tag} />
+          ))}
+        </datalist>
         
         <div style={{display:'flex',gap:8,marginTop:8}}>
           <select onChange={(e)=>setLineA(s=>({...s,accountId:e.target.value}))} value={lineA.accountId||''}>
@@ -323,12 +345,22 @@ export default function TransactionsPage() {
         )}
         
         <button onClick={create} style={{marginTop:8}} className="button-primary">{editingId ? '💾 Update' : '➕ Create'} {doubleEntry ? 'Double-Entry Tx' : 'Transaction'}</button>
+          </>
+        )}
       </div>
 
       <div className="card" style={{marginBottom:12, background: 'linear-gradient(135deg, var(--accent-light), var(--bg-secondary))'}}>
-        <h3 style={{marginTop: 0, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8}}>
-          <span style={{fontSize: '1.5rem'}}>🔄</span> Quick Transfer Between Accounts
+        <h3 
+          style={{marginTop: 0, marginBottom: showTransfer ? 12 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
+          onClick={() => setShowTransfer(!showTransfer)}
+        >
+          <span style={{display: 'flex', alignItems: 'center', gap: 8}}>
+            <span style={{fontSize: '1.5rem'}}>🔄</span> Quick Transfer Between Accounts
+          </span>
+          <span style={{fontSize: '1.2rem'}}>{showTransfer ? '▼' : '▶'}</span>
         </h3>
+        {showTransfer && (
+          <>
         <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 12}}>
           Transfer money from one account to another instantly
         </p>
@@ -365,10 +397,20 @@ export default function TransactionsPage() {
         <button onClick={quickTransfer} className="button-success" style={{width: '100%'}}>
           🔄 Transfer {transferAmount && `${formatCurrency(Number(transferAmount), currency)}`}
         </button>
+          </>
+        )}
       </div>
 
       <div className="card" style={{marginBottom:12}}>
-        <h3 style={{marginTop:0,marginBottom:8}}>🔍 Filter & Search</h3>
+        <h3 
+          style={{marginTop:0, marginBottom: showFilters ? 8 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
+          onClick={() => setShowFilters(!showFilters)}
+        >
+          <span>🔍 Filter & Search</span>
+          <span style={{fontSize: '1.2rem'}}>{showFilters ? '▼' : '▶'}</span>
+        </h3>
+        {showFilters && (
+          <>
         <input 
           placeholder="Search by description or date..." 
           value={searchTerm} 
@@ -383,51 +425,41 @@ export default function TransactionsPage() {
           <option value="">All tags</option>
           {getAllTags().map(tag=> <option key={tag} value={tag}>{tag}</option>)}
         </select>
+          </>
+        )}
       </div>
 
       <ul className="list">
         {filteredItems.map((t) => {
           const budget = getBudgetName(t.budgetId)
           return (
-          <li key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-            <div>
-              <div style={{fontWeight:500}}>
-                {t.date} — {t.description || 'No description'}
+          <li key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:2,flexWrap:'wrap'}}>
+                <span style={{fontSize:'0.75rem',color:'#6b7280',whiteSpace:'nowrap'}}>{t.date}</span>
+                <span style={{fontSize:'0.875rem',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis'}}>{t.description || 'No description'}</span>
                 {budget && (
-                  <span 
-                    style={{
-                      marginLeft: 8,
-                      padding: '2px 8px',
-                      borderRadius: 4,
-                      fontSize: '0.75rem',
-                      background: '#0ea5a4',
-                      color: 'white'
-                    }}
-                  >
+                  <span style={{padding:'1px 6px',borderRadius:3,fontSize:'0.7rem',background:'#0ea5a4',color:'white',whiteSpace:'nowrap'}}>
                     {budget.name}
                   </span>
                 )}
-                {t.tags && t.tags.length > 0 && (
-                  <span style={{marginLeft:8}}>
-                    {t.tags.map(tag => (
-                      <span key={tag} style={{marginLeft:4,padding:'2px 6px',background:'#e0e7ff',color:'#4f46e5',borderRadius:4,fontSize:'0.7rem',fontWeight:500}}>
-                        🏷️ {tag}
-                      </span>
-                    ))}
+                {t.tags && t.tags.length > 0 && t.tags.map(tag => (
+                  <span key={tag} style={{padding:'1px 5px',background:'#e0e7ff',color:'#4f46e5',borderRadius:3,fontSize:'0.65rem',fontWeight:500,whiteSpace:'nowrap'}}>
+                    🏷️ {tag}
                   </span>
-                )}
+                ))}
               </div>
-              <div style={{fontSize:'0.875rem',color:'#6b7280',marginTop:4}}>
+              <div style={{fontSize:'0.75rem',color:'#6b7280'}}>
                 {t.lines.map((l, i)=> (
-                  <span key={i} style={{marginRight:12}}>
+                  <span key={i} style={{marginRight:8}}>
                     {getAccountName(l.accountId)}: {formatCurrency(l.amount, currency)}
                   </span>
                 ))}
               </div>
             </div>
-            <div style={{display:'flex',gap:8}}>
-              <button onClick={()=>startEdit(t.id)} className="button-primary">✏️ Edit</button>
-              <button onClick={()=>remove(t.id)} className="button-danger">🗑️ Delete</button>
+            <div style={{display:'flex',gap:4,flexShrink:0}}>
+              <button onClick={()=>startEdit(t.id)} className="button-primary" style={{padding:'6px 12px',fontSize:'0.8rem'}}>✏️</button>
+              <button onClick={()=>remove(t.id)} className="button-danger" style={{padding:'6px 12px',fontSize:'0.8rem'}}>🗑️</button>
             </div>
           </li>
         )
