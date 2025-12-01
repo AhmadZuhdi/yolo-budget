@@ -81,7 +81,14 @@ export default function SettingsPage() {
 
   async function doExport(){
     const dump = await db.exportAll()
-    const dataStr = JSON.stringify(dump, null, 2)
+    
+    // Remove sensitive data from export
+    const exportData = { ...dump }
+    if (exportData.meta) {
+      exportData.meta = exportData.meta.filter((m: any) => m.key !== 'githubToken')
+    }
+    
+    const dataStr = JSON.stringify(exportData, null, 2)
     const dataBlob = new Blob([dataStr], { type: 'application/json' })
     const url = URL.createObjectURL(dataBlob)
     const link = document.createElement('a')
@@ -152,7 +159,14 @@ export default function SettingsPage() {
     try {
       setExporting(true)
       const dump = await db.exportAll()
-      const dataStr = JSON.stringify(dump)
+      
+      // Remove sensitive data from export
+      const exportData = { ...dump }
+      if (exportData.meta) {
+        exportData.meta = exportData.meta.filter((m: any) => m.key !== 'githubToken')
+      }
+      
+      const dataStr = JSON.stringify(exportData)
       
       const response = await fetch('https://api.github.com/gists', {
         method: 'POST',
