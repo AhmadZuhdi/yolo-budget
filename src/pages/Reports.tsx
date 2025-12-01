@@ -193,6 +193,39 @@ export default function ReportsPage() {
     .sort(([, a], [, b]) => b - a)
     .slice(0, 5)
 
+  // Spending by tag
+  const spendingByTag: Record<string, { income: number; expenses: number; count: number }> = {}
+  
+  filteredTxs.forEach(tx => {
+    const tags = tx.tags && tx.tags.length > 0 ? tx.tags : ['Untagged']
+    
+    tags.forEach(tag => {
+      if (!spendingByTag[tag]) {
+        spendingByTag[tag] = { income: 0, expenses: 0, count: 0 }
+      }
+      
+      spendingByTag[tag].count++
+      
+      tx.lines.forEach(line => {
+        if (line.amount > 0) {
+          spendingByTag[tag].income += line.amount
+        } else {
+          spendingByTag[tag].expenses += Math.abs(line.amount)
+        }
+      })
+    })
+  })
+
+  // Adjust for double-entry
+  if (doubleEntry) {
+    Object.keys(spendingByTag).forEach(tag => {
+      spendingByTag[tag].income /= 2
+      spendingByTag[tag].expenses /= 2
+    })
+  }
+
+  const tagEntries = Object.entries(spendingByTag).sort(([, a], [, b]) => b.expenses - a.expenses)
+
   return (
     <div className="page container">
       <h2>📈 Reports & Insights</h2>
@@ -348,6 +381,56 @@ export default function ReportsPage() {
             </ul>
             {topAccounts.length === 0 && (
               <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No activity data</div>
+            )}
+          </div>
+
+          <div className="card" style={{marginTop: 12}}>
+            <h3 style={{marginTop: 0, marginBottom: 12}}>🏷️ Transactions by Tag</h3>
+            {tagEntries.length > 0 ? (
+              <div style={{overflowX: 'auto'}}>
+                <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                  <thead>
+                    <tr style={{borderBottom: '2px solid var(--border)'}}>
+                      <th style={{textAlign: 'left', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Tag</th>
+                      <th style={{textAlign: 'right', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Trx</th>
+                      <th style={{textAlign: 'right', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tagEntries.map(([tag, data]) => {
+                      const net = data.income - data.expenses
+                      return (
+                        <tr key={tag} style={{borderBottom: '1px solid var(--border)'}}>
+                          <td style={{padding: '12px 8px', fontWeight: 500}}>
+                            <span style={{
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              background: tag === 'Untagged' ? '#e5e7eb' : '#dbeafe',
+                              color: tag === 'Untagged' ? '#6b7280' : '#1e40af',
+                              fontSize: '0.875rem'
+                            }}>
+                              {tag}
+                            </span>
+                          </td>
+                          <td style={{padding: '12px 8px', textAlign: 'right', color: '#6b7280'}}>{data.count}</td>
+                          <td style={{padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: net >= 0 ? '#10b981' : '#ef4444'}}>
+                            {formatCurrency(net, currency)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    <tr style={{background: 'var(--accent-light)', fontWeight: 700, borderTop: '2px solid var(--border)'}}>
+                      <td style={{padding: '12px 8px'}}>Total</td>
+                      <td style={{padding: '12px 8px', textAlign: 'right'}}>{filteredTxs.length}</td>
+                      <td style={{padding: '12px 8px', textAlign: 'right', color: totalIncome - totalExpenses >= 0 ? '#10b981' : '#ef4444'}}>
+                        {formatCurrency(totalIncome - totalExpenses, currency)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No tagged transactions</div>
             )}
           </div>
         </>

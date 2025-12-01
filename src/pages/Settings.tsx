@@ -11,6 +11,10 @@ export default function SettingsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [defaultAccountId, setDefaultAccountId] = useState('')
   const [defaultBudgetId, setDefaultBudgetId] = useState('')
+  const [githubToken, setGithubToken] = useState('')
+  const [gistUrl, setGistUrl] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
 
   useEffect(()=>{
     let mounted = true
@@ -22,8 +26,9 @@ export default function SettingsPage() {
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('defaultAccountId'),
-      db.getMeta<string>('defaultBudgetId')
-    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId]) => {
+      db.getMeta<string>('defaultBudgetId'),
+      db.getMeta<string>('githubToken')
+    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
@@ -33,6 +38,7 @@ export default function SettingsPage() {
         setBudgets(buds)
         setDefaultAccountId(defAccId || '')
         setDefaultBudgetId(defBudId || '')
+        setGithubToken(ghToken || '')
         setLoading(false)
       }
     })
@@ -129,6 +135,102 @@ export default function SettingsPage() {
       window.location.reload()
     } catch (e: any) {
       alert('Error during reset: ' + e.message)
+    }
+  }
+
+  async function savePastebinApiKey(){
+    await db.setMeta('githubToken', githubToken)
+    alert('GitHub token saved!')
+  }
+
+  async function exportToPastebin(){
+    if (!githubToken) {
+      alert('Please enter and save your GitHub token first!')
+      return
+    }
+
+    try {
+      setExporting(true)
+      const dump = await db.exportAll()
+      const dataStr = JSON.stringify(dump)
+      
+      const response = await fetch('https://api.github.com/gists', {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${githubToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          description: `Yolo Budget Backup - ${new Date().toISOString().slice(0, 10)}`,
+          public: false,
+          files: {
+            'yolo-budget-backup.json': {
+              content: dataStr
+            }
+          }
+        })
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.message || 'Failed to create gist')
+      }
+
+      const result = await response.json()
+      
+      alert(`✅ Data exported to GitHub Gist!\n\nURL: ${result.html_url}\n\nSave this URL to import your data later.`)
+      setGistUrl(result.html_url)
+    } catch (e: any) {
+      alert('Export error: ' + e.message)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function importFromPastebin(){
+    if (!gistUrl) {
+      alert('Please enter a GitHub Gist URL!')
+      return
+    }
+
+    try {
+      setImporting(true)
+      
+      // Extract gist ID from URL
+      let gistId = gistUrl
+      if (gistUrl.includes('gist.github.com/')) {
+        const parts = gistUrl.split('/')
+        gistId = parts[parts.length - 1]
+      }
+
+      // Fetch gist data
+      const response = await fetch(`https://api.github.com/gists/${gistId}`)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch gist: ${response.statusText}`)
+      }
+
+      const gist = await response.json()
+      
+      // Get the first file's content
+      const files = Object.values(gist.files) as any[]
+      if (!files.length) {
+        throw new Error('No files found in gist')
+      }
+
+      const content = files[0].content
+      const parsed = JSON.parse(content)
+      
+      if (!confirm('This will erase all current data and import from GitHub Gist. Continue?')) {
+        return
+      }
+      
+      await db.importAll(parsed, { clearBefore: true })
+      alert('Import successful! Refreshing page...')
+      window.location.reload()
+    } catch (e: any) {
+      alert('Import error: ' + e.message)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -246,7 +348,7 @@ export default function SettingsPage() {
         <button onClick={saveDefaults} className="button-primary">💾 Save Defaults</button>
       </div>
 
-      <div className="card">
+      <div className="card" style={{marginBottom: 20}}>
         <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
           <span style={{fontSize: '1.5rem'}}>💾</span> Data Management
         </h3>
@@ -264,6 +366,92 @@ export default function SettingsPage() {
             <li>Export creates a downloadable backup file</li>
             <li>Import will replace all current data</li>
             <li>Factory Reset permanently deletes everything</li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>📋</span> GitHub Gist Backup
+        </h3>
+        <p style={{color: '#6b7280', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+          Export/import your data using GitHub Gist. Create a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style={{color: '#0ea5a4'}}>github.com/settings/tokens</a> with <strong>gist</strong> scope.
+        </p>
+        
+        <div style={{marginBottom: 20}}>
+          <label style={{marginBottom: 8}}>GitHub Personal Access Token</label>
+          <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+            <input 
+              type="password"
+              value={githubToken} 
+              onChange={(e) => setGithubToken(e.target.value)}
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              style={{flex: 1}}
+            />
+            <button onClick={savePastebinApiKey} style={{whiteSpace: 'nowrap'}}>💾 Save Token</button>
+          </div>
+          <small style={{color: '#6b7280', fontSize: '0.75rem', marginTop: 4, display: 'block'}}>
+            Token needs 'gist' permission only
+          </small>
+        </div>
+
+        <div style={{marginBottom: 20, paddingTop: 20, borderTop: '1px solid var(--border)'}}>
+          <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '1rem'}}>Export to GitHub Gist</h4>
+          <button 
+            onClick={exportToPastebin} 
+            disabled={exporting || !githubToken}
+            style={{
+              background: exporting ? '#9ca3af' : '#10b981',
+              cursor: exporting || !githubToken ? 'not-allowed' : 'pointer',
+              opacity: exporting || !githubToken ? 0.6 : 1
+            }}
+          >
+            {exporting ? '⏳ Exporting...' : '📤 Export to GitHub Gist'}
+          </button>
+          {gistUrl && (
+            <div style={{marginTop: 12, padding: 12, background: '#d1fae5', border: '1px solid #10b981', borderRadius: 8, fontSize: '0.875rem'}}>
+              <strong>✅ Last export URL:</strong>
+              <div style={{marginTop: 8, wordBreak: 'break-all'}}>
+                <a href={gistUrl} target="_blank" rel="noopener noreferrer" style={{color: '#059669'}}>
+                  {gistUrl}
+                </a>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{paddingTop: 20, borderTop: '1px solid var(--border)'}}>
+          <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '1rem'}}>Import from GitHub Gist</h4>
+          <div style={{marginBottom: 12}}>
+            <label style={{marginBottom: 8}}>GitHub Gist URL or ID</label>
+            <input 
+              type="text"
+              value={gistUrl} 
+              onChange={(e) => setGistUrl(e.target.value)}
+              placeholder="https://gist.github.com/username/..."
+              style={{width: '100%'}}
+            />
+          </div>
+          <button 
+            onClick={importFromPastebin}
+            disabled={importing || !gistUrl}
+            style={{
+              background: importing ? '#9ca3af' : '#3b82f6',
+              cursor: importing || !gistUrl ? 'not-allowed' : 'pointer',
+              opacity: importing || !gistUrl ? 0.6 : 1
+            }}
+          >
+            {importing ? '⏳ Importing...' : '📥 Import from GitHub Gist'}
+          </button>
+        </div>
+
+        <div style={{marginTop: 16, padding: 12, background: '#dbeafe', border: '1px solid #3b82f6', borderRadius: 8, fontSize: '0.875rem'}}>
+          <strong>ℹ️ GitHub Gist Benefits:</strong>
+          <ul style={{margin: '8px 0', paddingLeft: 20}}>
+            <li>Private gists (not publicly searchable)</li>
+            <li>No expiration - saved forever</li>
+            <li>Version history included</li>
+            <li>Fast and reliable GitHub infrastructure</li>
           </ul>
         </div>
       </div>
