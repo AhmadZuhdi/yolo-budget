@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { db, Account, Budget } from '../db/indexeddb'
+import packageJson from '../../package.json'
 
 export default function SettingsPage() {
   const [currency, setCurrency] = useState('USD')
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   const [gistUrl, setGistUrl] = useState('')
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [monthCycleDay, setMonthCycleDay] = useState(1)
 
   useEffect(()=>{
     let mounted = true
@@ -27,8 +29,9 @@ export default function SettingsPage() {
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('defaultAccountId'),
       db.getMeta<string>('defaultBudgetId'),
-      db.getMeta<string>('githubToken')
-    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken]) => {
+      db.getMeta<string>('githubToken'),
+      db.getMeta<number>('monthCycleDay')
+    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
@@ -39,6 +42,7 @@ export default function SettingsPage() {
         setDefaultAccountId(defAccId || '')
         setDefaultBudgetId(defBudId || '')
         setGithubToken(ghToken || '')
+        setMonthCycleDay(cycleDay || 1)
         setLoading(false)
       }
     })
@@ -77,6 +81,11 @@ export default function SettingsPage() {
     // Dispatch event to notify Nav component
     window.dispatchEvent(new Event('settingsChanged'))
     alert('Navigation style saved!')
+  }
+
+  async function saveMonthCycleDay(){
+    await db.setMeta('monthCycleDay', monthCycleDay)
+    alert('Month cycle day saved!')
   }
 
   async function doExport(){
@@ -250,9 +259,14 @@ export default function SettingsPage() {
 
   return (
     <div className="page container">
-      <h2 style={{marginBottom: 24, fontSize: '1.75rem', fontWeight: 700}}>Settings</h2>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24}}>
+        <h2 style={{fontSize: '1.75rem', fontWeight: 700, margin: 0}}>Settings</h2>
+        <span style={{fontSize: '0.875rem', color: 'var(--text-secondary)', padding: '4px 12px', background: 'var(--accent-light)', borderRadius: 16}}>
+          v{packageJson.version}
+        </span>
+      </div>
       {loading ? (
-        <div className="card" style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>Loading settings...</div>
+        <div className="card" style={{padding: 40, textAlign: 'center', color: 'var(--text-secondary)'}}>Loading settings...</div>
       ) : (
         <>
       <div className="card" style={{marginBottom: 20}}>
@@ -271,9 +285,33 @@ export default function SettingsPage() {
 
       <div className="card" style={{marginBottom: 20}}>
         <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>📅</span> Month Cycle Day
+        </h3>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+          Set which day of the month your monthly cycle starts. For example, if your salary/bills are on the 25th, set it to 25. This affects the "Month" filter in Reports.
+        </p>
+        <label style={{marginBottom: 8}}>Month starts on day</label>
+        <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+          <input 
+            type="number" 
+            min="1" 
+            max="31" 
+            value={monthCycleDay} 
+            onChange={(e) => setMonthCycleDay(parseInt(e.target.value) || 1)}
+            style={{flex: 1}}
+          />
+          <button onClick={saveMonthCycleDay} style={{whiteSpace: 'nowrap'}}>Save Cycle Day</button>
+        </div>
+        <small style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 8, display: 'block'}}>
+          Example: Day 25 means from last month 25th to this month 25th
+        </small>
+      </div>
+
+      <div className="card" style={{marginBottom: 20}}>
+        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
           <span style={{fontSize: '1.5rem'}}>⚙️</span> Transaction Mode
         </h3>
-        <p style={{color: '#6b7280', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
           Double-entry accounting ensures balanced transactions. Simple mode allows quick income/expense tracking without requiring balanced entries.
         </p>
         <label style={{display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 12}}>
@@ -283,7 +321,7 @@ export default function SettingsPage() {
             onChange={(e) => setDoubleEntry(e.target.checked)}
             style={{width: 20, height: 20, cursor: 'pointer'}}
           />
-          <span style={{fontWeight: 500}}>Enable Double-Entry Mode</span>
+          <span style={{fontWeight: 500, color: 'var(--text)'}}>Enable Double-Entry Mode</span>
         </label>
         <button onClick={saveDoubleEntry} className="button-primary">💾 Save Transaction Mode</button>
       </div>
@@ -302,7 +340,7 @@ export default function SettingsPage() {
             onChange={(e) => setDarkMode(e.target.checked)}
             style={{width: 20, height: 20, cursor: 'pointer'}}
           />
-          <span style={{fontWeight: 500}}>Enable Dark Mode</span>
+          <span style={{fontWeight: 500, color: 'var(--text)'}}>Enable Dark Mode</span>
         </label>
         <button onClick={saveDarkMode} className="button-primary">💾 Save Theme</button>
       </div>
@@ -321,7 +359,7 @@ export default function SettingsPage() {
             onChange={(e) => setUseBottomNav(e.target.checked)}
             style={{width: 20, height: 20, cursor: 'pointer'}}
           />
-          <span style={{fontWeight: 500}}>Use Bottom Navigation</span>
+          <span style={{fontWeight: 500, color: 'var(--text)'}}>Use Bottom Navigation</span>
         </label>
         <button onClick={saveBottomNav} className="button-primary">💾 Save Navigation Style</button>
       </div>
@@ -330,7 +368,7 @@ export default function SettingsPage() {
         <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
           <span style={{fontSize: '1.5rem'}}>⚡</span> Quick Transaction Defaults
         </h3>
-        <p style={{color: '#6b7280', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
           Set default account and budget to pre-fill when creating new transactions.
         </p>
         <div style={{marginBottom: 16}}>
@@ -366,7 +404,7 @@ export default function SettingsPage() {
         <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
           <span style={{fontSize: '1.5rem'}}>💾</span> Data Management
         </h3>
-        <p style={{color: '#6b7280', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
           Export your data as a JSON file for backup or import from a previous backup file.
         </p>
         <div style={{display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap'}}>
@@ -374,7 +412,7 @@ export default function SettingsPage() {
           <button onClick={doImport} className="button-primary">📥 Import from File</button>
           <button onClick={factoryReset} className="button-danger">🗑️ Factory Reset</button>
         </div>
-        <div style={{padding: 12, background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 8, fontSize: '0.875rem'}}>
+        <div style={{padding: 12, background: 'var(--accent-light)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', color: 'var(--text)'}}>
           <strong>⚠️ Important:</strong> 
           <ul style={{margin: '8px 0', paddingLeft: 20}}>
             <li>Export creates a downloadable backup file</li>
@@ -388,7 +426,7 @@ export default function SettingsPage() {
         <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
           <span style={{fontSize: '1.5rem'}}>📋</span> GitHub Gist Backup
         </h3>
-        <p style={{color: '#6b7280', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
           Export/import your data using GitHub Gist. Create a Personal Access Token at <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style={{color: '#0ea5a4'}}>github.com/settings/tokens</a> with <strong>gist</strong> scope.
         </p>
         
@@ -404,7 +442,7 @@ export default function SettingsPage() {
             />
             <button onClick={savePastebinApiKey} style={{whiteSpace: 'nowrap'}}>💾 Save Token</button>
           </div>
-          <small style={{color: '#6b7280', fontSize: '0.75rem', marginTop: 4, display: 'block'}}>
+          <small style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 4, display: 'block'}}>
             Token needs 'gist' permission only
           </small>
         </div>
@@ -459,7 +497,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <div style={{marginTop: 16, padding: 12, background: '#dbeafe', border: '1px solid #3b82f6', borderRadius: 8, fontSize: '0.875rem'}}>
+        <div style={{marginTop: 16, padding: 12, background: 'var(--accent-light)', border: '1px solid var(--border)', borderRadius: 8, fontSize: '0.875rem', color: 'var(--text)'}}>
           <strong>ℹ️ GitHub Gist Benefits:</strong>
           <ul style={{margin: '8px 0', paddingLeft: 20}}>
             <li>Private gists (not publicly searchable)</li>

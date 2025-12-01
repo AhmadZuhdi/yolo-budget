@@ -93,30 +93,26 @@ export default function AccountsPage() {
       return
     }
 
-    // Find or create a reconciliation account
-    let reconcileAcc = items.find(a => a.name === 'Reconciliation' && a.type === 'other')
-    if (!reconcileAcc) {
-      reconcileAcc = { 
-        id: `acc:reconcile:${Date.now()}`, 
-        name: 'Reconciliation', 
-        type: 'other', 
-        balance: 0 
-      }
-      await db.put('accounts', reconcileAcc)
-    }
-
-    // Create reconciliation transaction
+    // Create reconciliation transaction as income/expense with 'reconcile' tag
     const tx = {
       id: `tx:${Date.now()}`,
       date: new Date().toISOString().split('T')[0],
-      description: `Reconciliation for ${reconcilingAccount.name}`,
+      description: `Reconciliation adjustment for ${reconcilingAccount.name}`,
+      tags: ['reconcile'],
       lines: [
-        { accountId: reconcilingAccount.id, amount: difference },
-        { accountId: reconcileAcc.id, amount: -difference }
+        { accountId: reconcilingAccount.id, amount: difference }
       ]
     }
 
-    await db.addTransaction(tx)
+    await db.add('transactions', tx)
+    
+    // Update account balance
+    const acc = await db.get<Account>('accounts', reconcilingAccount.id)
+    if (acc) {
+      acc.balance = (acc.balance || 0) + difference
+      await db.put('accounts', acc)
+    }
+    
     setItems(await db.getAll('accounts'))
     setReconcilingAccount(null)
     setReconcileAmount('')

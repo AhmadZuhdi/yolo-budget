@@ -17,24 +17,27 @@ export default function ReportsPage() {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year' | 'all' | 'custom'>('month')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+  const [monthCycleDay, setMonthCycleDay] = useState(1)
 
   useEffect(() => {
     loadData()
   }, [])
 
   async function loadData() {
-    const [txs, accs, buds, curr, de] = await Promise.all([
+    const [txs, accs, buds, curr, de, cycleDay] = await Promise.all([
       db.getAll<Transaction>('transactions'),
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('currency'),
-      db.getMeta<boolean>('doubleEntry')
+      db.getMeta<boolean>('doubleEntry'),
+      db.getMeta<number>('monthCycleDay')
     ])
     setTransactions(txs)
     setAccounts(accs)
     setBudgets(buds)
     setCurrency(curr || 'USD')
     setDoubleEntry(de !== false)
+    setMonthCycleDay(cycleDay || 1)
     setLoading(false)
   }
 
@@ -49,7 +52,15 @@ export default function ReportsPage() {
         startDateObj = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
         break
       case 'month':
-        startDateObj = new Date(now.getFullYear(), now.getMonth(), 1)
+        // Use custom cycle day for month start
+        const currentDay = now.getDate()
+        if (currentDay >= monthCycleDay) {
+          // We're in the current cycle (from this month's cycle day to next month's cycle day)
+          startDateObj = new Date(now.getFullYear(), now.getMonth(), monthCycleDay)
+        } else {
+          // We're before the cycle day, so the cycle started last month
+          startDateObj = new Date(now.getFullYear(), now.getMonth() - 1, monthCycleDay)
+        }
         break
       case 'year':
         startDateObj = new Date(now.getFullYear(), 0, 1)
