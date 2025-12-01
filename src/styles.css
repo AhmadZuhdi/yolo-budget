@@ -322,3 +322,69 @@ label{
 @media(min-width:1024px){
   .container{max-width:1200px}
 }
+
+/* Bottom Navigation */
+.bottom-nav{
+  position:fixed;
+  bottom:0;
+  left:0;
+  right:0;
+  background:var(--bg-secondary);
+  border-top:1px solid var(--border);
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+  padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+  box-shadow:0 -2px 8px rgba(0,0,0,0.1);
+  z-index:100;
+}
+
+.bottom-nav > *{
+  flex:1;
+  max-width:100px;
+}
+
+.bottom-nav a{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  text-decoration:none;
+  color:var(--text-secondary);
+  padding:6px 12px;
+  border-radius:8px;
+  transition:all 0.2s ease;
+}
+
+.bottom-nav a .icon{
+  font-size:1.5rem;
+  margin-bottom:2px;
+}
+
+.bottom-nav a .label{
+  font-size:0.65rem;
+  font-weight:500;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:100%;
+}
+
+.bottom-nav a.active{
+  color:var(--accent);
+}
+
+.bottom-nav a.active .icon{
+  transform:scale(1.1);
+}
+
+/* Hide hamburger and FAB when using bottom nav */
+body.bottom-nav-mode .hamburger,
+body.bottom-nav-mode .fab{
+  display:none;
+}
+
+/* Add padding to main content when bottom nav is active */
+body.bottom-nav-mode main{
+  padding-bottom:70px;
+}

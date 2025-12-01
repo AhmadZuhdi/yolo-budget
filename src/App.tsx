@@ -18,6 +18,31 @@ export default function App() {
         document.documentElement.setAttribute('data-theme', 'dark')
       }
     })
+
+    // Apply bottom nav mode
+    db.getMeta<boolean>('useBottomNav').then(useBottomNav => {
+      if (useBottomNav) {
+        document.body.classList.add('bottom-nav-mode')
+      } else {
+        document.body.classList.remove('bottom-nav-mode')
+      }
+    })
+
+    // Listen for settings changes
+    const handleSettingsChange = () => {
+      db.getMeta<boolean>('useBottomNav').then(useBottomNav => {
+        if (useBottomNav) {
+          document.body.classList.add('bottom-nav-mode')
+        } else {
+          document.body.classList.remove('bottom-nav-mode')
+        }
+      })
+    }
+    window.addEventListener('settingsChanged', handleSettingsChange)
+
+    return () => {
+      window.removeEventListener('settingsChanged', handleSettingsChange)
+    }
   }, [])
 
   return (

@@ -12,6 +12,8 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [reconcilingAccount, setReconcilingAccount] = useState<Account | null>(null)
+  const [reconcileAmount, setReconcileAmount] = useState('')
 
   useEffect(() => {
     let mounted = true
@@ -67,6 +69,57 @@ export default function AccountsPage() {
     }
     await db.delete('accounts', id)
     setItems(await db.getAll('accounts'))
+  }
+
+  async function startReconcile(acc: Account) {
+    setReconcilingAccount(acc)
+    setReconcileAmount(String(acc.balance ?? 0))
+  }
+
+  async function performReconcile() {
+    if (!reconcilingAccount) return
+    const finalAmount = parseFloat(reconcileAmount)
+    if (isNaN(finalAmount)) {
+      alert('Please enter a valid amount')
+      return
+    }
+    
+    const currentBalance = reconcilingAccount.balance ?? 0
+    const difference = finalAmount - currentBalance
+    
+    if (Math.abs(difference) < 0.01) {
+      alert('No reconciliation needed - balances match!')
+      setReconcilingAccount(null)
+      return
+    }
+
+    // Find or create a reconciliation account
+    let reconcileAcc = items.find(a => a.name === 'Reconciliation' && a.type === 'other')
+    if (!reconcileAcc) {
+      reconcileAcc = { 
+        id: `acc:reconcile:${Date.now()}`, 
+        name: 'Reconciliation', 
+        type: 'other', 
+        balance: 0 
+      }
+      await db.put('accounts', reconcileAcc)
+    }
+
+    // Create reconciliation transaction
+    const tx = {
+      id: `tx:${Date.now()}`,
+      date: new Date().toISOString().split('T')[0],
+      description: `Reconciliation for ${reconcilingAccount.name}`,
+      lines: [
+        { accountId: reconcilingAccount.id, amount: difference },
+        { accountId: reconcileAcc.id, amount: -difference }
+      ]
+    }
+
+    await db.addTransaction(tx)
+    setItems(await db.getAll('accounts'))
+    setReconcilingAccount(null)
+    setReconcileAmount('')
   }
 
   return (
@@ -161,8 +214,8 @@ export default function AccountsPage() {
                         position:'absolute',
                         right:0,
                         top:'100%',
-                        background:'white',
-                        border:'1px solid #e5e7eb',
+                        background:'var(--bg-secondary)',
+                        border:'1px solid var(--border)',
                         borderRadius:6,
                         boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
                         minWidth:140,
@@ -175,18 +228,40 @@ export default function AccountsPage() {
                             width:'100%',
                             padding:'10px 16px',
                             textAlign:'left',
-                            background:'white',
+                            background:'var(--bg-secondary)',
                             border:'none',
                             cursor:'pointer',
                             fontSize:'0.875rem',
+                            color:'var(--text)',
                             display:'flex',
                             alignItems:'center',
                             gap:8
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                         >
                           <span>✏️</span> Edit
+                        </button>
+                        <button 
+                          onClick={() => {startReconcile(a); setOpenMenuId(null)}}
+                          style={{
+                            width:'100%',
+                            padding:'10px 16px',
+                            textAlign:'left',
+                            background:'var(--bg-secondary)',
+                            border:'none',
+                            cursor:'pointer',
+                            fontSize:'0.875rem',
+                            color:'var(--text)',
+                            display:'flex',
+                            alignItems:'center',
+                            gap:8,
+                            borderTop:'1px solid var(--border)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                        >
+                          <span>⚖️</span> Reconcile
                         </button>
                         <button 
                           onClick={() => {remove(a.id); setOpenMenuId(null)}}
@@ -194,18 +269,18 @@ export default function AccountsPage() {
                             width:'100%',
                             padding:'10px 16px',
                             textAlign:'left',
-                            background:'white',
+                            background:'var(--bg-secondary)',
                             border:'none',
                             cursor:'pointer',
                             fontSize:'0.875rem',
-                            color:'#ef4444',
+                            color:'var(--danger)',
                             display:'flex',
                             alignItems:'center',
                             gap:8,
-                            borderTop:'1px solid #f3f4f6'
+                            borderTop:'1px solid var(--border)'
                           }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                         >
                           <span>🗑️</span> Delete
                         </button>
@@ -220,6 +295,113 @@ export default function AccountsPage() {
       </ul>
         )}
       </div>
+        </>
+      )}
+
+      {/* Reconcile Modal */}
+      {reconcilingAccount && (
+        <>
+          <div 
+            style={{
+              position:'fixed',
+              top:0,
+              left:0,
+              right:0,
+              bottom:0,
+              background:'rgba(0,0,0,0.5)',
+              zIndex:1000,
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'center'
+            }}
+            onClick={() => setReconcilingAccount(null)}
+          />
+          <div 
+            style={{
+              position:'fixed',
+              top:'50%',
+              left:'50%',
+              transform:'translate(-50%, -50%)',
+              background:'var(--bg-secondary)',
+              borderRadius:12,
+              padding:24,
+              boxShadow:'0 8px 16px rgba(0,0,0,0.2)',
+              zIndex:1001,
+              width:'90%',
+              maxWidth:400
+            }}
+          >
+            <h3 style={{marginTop:0, marginBottom:16}}>⚖️ Reconcile Account</h3>
+            <div style={{marginBottom:16,padding:12,background:'var(--accent-light)',borderRadius:6}}>
+              <div style={{fontSize:'0.875rem',color:'#6b7280',marginBottom:4}}>Account</div>
+              <div style={{fontWeight:600}}>{reconcilingAccount.name}</div>
+              <div style={{fontSize:'0.875rem',color:'#6b7280',marginTop:8}}>Current Balance</div>
+              <div style={{fontSize:'1.25rem',fontWeight:700,color:'var(--text)'}}>
+                {formatCurrency(reconcilingAccount.balance ?? 0, currency)}
+              </div>
+            </div>
+            <div style={{marginBottom:16}}>
+              <label>Final Balance</label>
+              <input 
+                type="number" 
+                step="0.01"
+                value={reconcileAmount} 
+                onChange={(e) => setReconcileAmount(e.target.value)}
+                placeholder="Enter final balance"
+                autoFocus
+              />
+            </div>
+            {reconcileAmount && !isNaN(parseFloat(reconcileAmount)) && (
+              <div style={{
+                marginBottom:16,
+                padding:12,
+                background:parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '#d1fae5' : '#fee2e2',
+                borderRadius:6
+              }}>
+                <div style={{fontSize:'0.875rem',fontWeight:600,marginBottom:4}}>
+                  Difference
+                </div>
+                <div style={{fontSize:'1.125rem',fontWeight:700,color:parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '#059669' : '#dc2626'}}>
+                  {formatCurrency(parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0), currency)}
+                </div>
+                <div style={{fontSize:'0.75rem',marginTop:4,color:'#6b7280'}}>
+                  A reconciliation transaction will be created
+                </div>
+              </div>
+            )}
+            <div style={{display:'flex',gap:8}}>
+              <button 
+                onClick={performReconcile}
+                style={{
+                  flex:1,
+                  padding:'12px',
+                  background:'#10b981',
+                  color:'white',
+                  border:'none',
+                  borderRadius:6,
+                  cursor:'pointer',
+                  fontWeight:600
+                }}
+              >
+                ✓ Reconcile
+              </button>
+              <button 
+                onClick={() => setReconcilingAccount(null)}
+                style={{
+                  flex:1,
+                  padding:'12px',
+                  background:'#6b7280',
+                  color:'white',
+                  border:'none',
+                  borderRadius:6,
+                  cursor:'pointer',
+                  fontWeight:600
+                }}
+              >
+                ✗ Cancel
+              </button>
+            </div>
+          </div>
         </>
       )}
     </div>

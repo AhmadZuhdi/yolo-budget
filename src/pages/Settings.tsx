@@ -5,6 +5,7 @@ export default function SettingsPage() {
   const [currency, setCurrency] = useState('USD')
   const [doubleEntry, setDoubleEntry] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
+  const [useBottomNav, setUseBottomNav] = useState(false)
   const [loading, setLoading] = useState(true)
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -17,15 +18,17 @@ export default function SettingsPage() {
       db.getMeta('currency'),
       db.getMeta('doubleEntry'),
       db.getMeta<boolean>('darkMode'),
+      db.getMeta<boolean>('useBottomNav'),
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('defaultAccountId'),
       db.getMeta<string>('defaultBudgetId')
-    ]).then(([curr, de, dark, accs, buds, defAccId, defBudId]) => {
+    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
         setDarkMode(dark || false)
+        setUseBottomNav(bottomNav || false)
         setAccounts(accs)
         setBudgets(buds)
         setDefaultAccountId(defAccId || '')
@@ -56,6 +59,18 @@ export default function SettingsPage() {
     await db.setMeta('darkMode', darkMode)
     document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
     alert('Theme saved!')
+  }
+
+  async function saveBottomNav(){
+    await db.setMeta('useBottomNav', useBottomNav)
+    if (useBottomNav) {
+      document.body.classList.add('bottom-nav-mode')
+    } else {
+      document.body.classList.remove('bottom-nav-mode')
+    }
+    // Dispatch event to notify Nav component
+    window.dispatchEvent(new Event('settingsChanged'))
+    alert('Navigation style saved!')
   }
 
   async function doExport(){
@@ -174,6 +189,25 @@ export default function SettingsPage() {
           <span style={{fontWeight: 500}}>Enable Dark Mode</span>
         </label>
         <button onClick={saveDarkMode} className="button-primary">💾 Save Theme</button>
+      </div>
+
+      <div className="card" style={{marginBottom: 20}}>
+        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>🧭</span> Navigation Style
+        </h3>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+          Choose between side menu (hamburger) or bottom navigation bar.
+        </p>
+        <label style={{display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 12}}>
+          <input 
+            type="checkbox" 
+            checked={useBottomNav} 
+            onChange={(e) => setUseBottomNav(e.target.checked)}
+            style={{width: 20, height: 20, cursor: 'pointer'}}
+          />
+          <span style={{fontWeight: 500}}>Use Bottom Navigation</span>
+        </label>
+        <button onClick={saveBottomNav} className="button-primary">💾 Save Navigation Style</button>
       </div>
 
       <div className="card" style={{marginBottom: 20}}>

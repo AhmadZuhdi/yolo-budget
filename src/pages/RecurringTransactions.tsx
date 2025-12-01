@@ -286,8 +286,8 @@ export default function RecurringTransactionsPage() {
                           position:'absolute',
                           right:0,
                           top:'100%',
-                          background:'white',
-                          border:'1px solid #e5e7eb',
+                          background:'var(--bg-secondary)',
+                          border:'1px solid var(--border)',
                           borderRadius:6,
                           boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
                           minWidth:160,
@@ -300,16 +300,17 @@ export default function RecurringTransactionsPage() {
                               width:'100%',
                               padding:'10px 16px',
                               textAlign:'left',
-                              background:'white',
+                              background:'var(--bg-secondary)',
                               border:'none',
                               cursor:'pointer',
                               fontSize:'0.875rem',
+                              color:'var(--text)',
                               display:'flex',
                               alignItems:'center',
                               gap:8
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                           >
                             <span>{r.active ? '⏸️' : '▶️'}</span> {r.active ? 'Pause' : 'Activate'}
                           </button>
@@ -319,16 +320,17 @@ export default function RecurringTransactionsPage() {
                               width:'100%',
                               padding:'10px 16px',
                               textAlign:'left',
-                              background:'white',
+                              background:'var(--bg-secondary)',
                               border:'none',
                               cursor:'pointer',
                               fontSize:'0.875rem',
+                              color:'var(--text)',
                               display:'flex',
                               alignItems:'center',
                               gap:8
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                           >
                             <span>✏️</span> Edit
                           </button>
@@ -338,18 +340,18 @@ export default function RecurringTransactionsPage() {
                               width:'100%',
                               padding:'10px 16px',
                               textAlign:'left',
-                              background:'white',
+                              background:'var(--bg-secondary)',
                               border:'none',
                               cursor:'pointer',
                               fontSize:'0.875rem',
-                              color:'#ef4444',
+                              color:'var(--danger)',
                               display:'flex',
                               alignItems:'center',
                               gap:8,
-                              borderTop:'1px solid #f3f4f6'
+                              borderTop:'1px solid var(--border)'
                             }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#fef2f2'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = 'white'}
+                            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                            onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
                           >
                             <span>🗑️</span> Delete
                           </button>
