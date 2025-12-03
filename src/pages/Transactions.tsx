@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db, Transaction, TransactionLine, Account, Budget } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
+import { WithContext as ReactTags, Tag } from 'react-tag-input'
+
+const KeyCodes = {
+  comma: 188,
+  enter: 13
+}
+
+const delimiters = [KeyCodes.comma, KeyCodes.enter]
 
 export default function TransactionsPage() {
   const navigate = useNavigate()
@@ -11,7 +19,7 @@ export default function TransactionsPage() {
   const [desc, setDesc] = useState('')
   const [date, setDate] = useState(new Date().toISOString().slice(0,10))
   const [budgetId, setBudgetId] = useState('')
-  const [tagsInput, setTagsInput] = useState('')
+  const [tags, setTags] = useState<Tag[]>([])
   const [lineA, setLineA] = useState<{accountId?:string;amount?:number}>({})
   const [lineB, setLineB] = useState<{accountId?:string;amount?:number}>({})
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -27,6 +35,7 @@ export default function TransactionsPage() {
   const [showTransfer, setShowTransfer] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
   
   // Transfer state
   const [transferFrom, setTransferFrom] = useState('')
@@ -121,7 +130,7 @@ export default function TransactionsPage() {
         date,
         description: desc,
         budgetId: budgetId || undefined,
-        tags: tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : undefined,
+        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
         lines: [
           { accountId: lineA.accountId!, amount: aAmt },
           { accountId: lineB.accountId!, amount: bAmt }
@@ -138,7 +147,7 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setBudgetId('')
-        setTagsInput('')
+        setTags([])
         setLineA({})
         setLineB({})
       } catch (e: any) {
@@ -151,7 +160,7 @@ export default function TransactionsPage() {
         date,
         description: desc,
         budgetId: budgetId || undefined,
-        tags: tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : undefined,
+        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
         lines: [
           { accountId: lineA.accountId!, amount: aAmt }
         ]
@@ -183,7 +192,7 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setBudgetId('')
-        setTagsInput('')
+        setTags([])
         setLineA({})
         setLineB({})
       } catch (e: any) {
@@ -199,7 +208,7 @@ export default function TransactionsPage() {
     setDesc(tx.description || '')
     setDate(tx.date)
     setBudgetId(tx.budgetId || '')
-    setTagsInput(tx.tags ? tx.tags.join(', ') : '')
+    setTags(tx.tags ? tx.tags.map((tag, index) => ({ id: String(index), text: tag })) : [])
     setLineA({ accountId: tx.lines[0]?.accountId, amount: tx.lines[0]?.amount })
     if (doubleEntry && tx.lines[1]) {
       setLineB({ accountId: tx.lines[1]?.accountId, amount: tx.lines[1]?.amount })
@@ -324,19 +333,18 @@ export default function TransactionsPage() {
           <option value="">No budget</option>
           {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <input 
-          value={tagsInput} 
-          onChange={(e)=>setTagsInput(e.target.value)} 
-          placeholder="Tags (comma separated, e.g., food, groceries, shopping)" 
-          style={{marginTop:8}}
-          list="tags-datalist"
-        />
-        <datalist id="tags-datalist">
-          {getAllTags().map(tag => (
-            <option key={tag} value={tag} />
-          ))}
-        </datalist>
-        
+        <div style={{marginTop:8}}>
+          <ReactTags
+            tags={tags}
+            handleDelete={(i: number) => setTags(tags.filter((tag, index) => index !== i))}
+            handleAddition={(tag: Tag) => setTags([...tags, tag])}
+            suggestions={getAllTags().map((t, idx) => ({ id: String(idx), text: t }))}
+            placeholder="Add tag (press Enter)"
+            autofocus={false}
+            allowDragDrop={false}
+            inputFieldPosition="top"
+          />
+        </div>
         <div style={{display:'flex',gap:8,marginTop:8}}>
           <select onChange={(e)=>setLineA(s=>({...s,accountId:e.target.value}))} value={lineA.accountId||''}>
             <option value="">Select account</option>
@@ -418,13 +426,49 @@ export default function TransactionsPage() {
       </div>
 
       <div className="card" style={{marginBottom:12}}>
-        <h3 
-          style={{marginTop:0, marginBottom: showFilters ? 8 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
-          onClick={() => setShowFilters(!showFilters)}
-        >
-          <span>🔍 Filter & Search</span>
-          <span style={{fontSize: '1.2rem'}}>{showFilters ? '▼' : '▶'}</span>
-        </h3>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+          <h3 
+            style={{margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, flex: 1}}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <span>🔍 Filter & Search</span>
+            <span style={{fontSize: '1.2rem'}}>{showFilters ? '▼' : '▶'}</span>
+          </h3>
+          <div style={{display:'flex',gap:4,background:'var(--bg)',borderRadius:6,padding:2}}>
+            <button
+              onClick={() => setViewMode('card')}
+              style={{
+                padding:'6px 12px',
+                border:'none',
+                borderRadius:4,
+                cursor:'pointer',
+                background: viewMode === 'card' ? 'var(--accent)' : 'transparent',
+                color: viewMode === 'card' ? 'white' : 'var(--text)',
+                fontSize:'0.875rem',
+                fontWeight: viewMode === 'card' ? 600 : 400,
+                transition:'all 0.2s'
+              }}
+            >
+              📋 Cards
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              style={{
+                padding:'6px 12px',
+                border:'none',
+                borderRadius:4,
+                cursor:'pointer',
+                background: viewMode === 'table' ? 'var(--accent)' : 'transparent',
+                color: viewMode === 'table' ? 'white' : 'var(--text)',
+                fontSize:'0.875rem',
+                fontWeight: viewMode === 'table' ? 600 : 400,
+                transition:'all 0.2s'
+              }}
+            >
+              📊 Table
+            </button>
+          </div>
+        </div>
         {showFilters && (
           <>
         <input 
@@ -445,6 +489,154 @@ export default function TransactionsPage() {
         )}
       </div>
 
+      {viewMode === 'table' ? (
+        <div className="card" style={{overflowX:'auto',padding:0}}>
+          <table style={{width:'100%',borderCollapse:'collapse'}}>
+            <thead>
+              <tr style={{background:'var(--accent-light)',borderBottom:'2px solid var(--border)'}}>
+                <th style={{padding:'12px',textAlign:'left',color:'var(--text)',fontWeight:600,fontSize:'0.875rem'}}>Date</th>
+                <th style={{padding:'12px',textAlign:'left',color:'var(--text)',fontWeight:600,fontSize:'0.875rem'}}>Description</th>
+                <th style={{padding:'12px',textAlign:'left',color:'var(--text)',fontWeight:600,fontSize:'0.875rem'}}>Account(s)</th>
+                <th style={{padding:'12px',textAlign:'left',color:'var(--text)',fontWeight:600,fontSize:'0.875rem'}}>Budget</th>
+                <th style={{padding:'12px',textAlign:'left',color:'var(--text)',fontWeight:600,fontSize:'0.875rem'}}>Tags</th>
+                <th style={{padding:'12px',textAlign:'right',color:'var(--text)',fontWeight:600,fontSize:'0.875rem'}}>Amount</th>
+                <th style={{padding:'12px',textAlign:'center',color:'var(--text)',fontWeight:600,fontSize:'0.875rem',width:'60px'}}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredItems.map((t) => {
+                const budget = getBudgetName(t.budgetId)
+                return (
+                  <tr key={t.id} style={{borderBottom:'1px solid var(--border)'}}>
+                    <td style={{padding:'12px',fontSize:'0.8rem',color:'var(--text-secondary)',whiteSpace:'nowrap'}}>{t.date}</td>
+                    <td style={{padding:'12px',fontSize:'0.875rem',color:'var(--text)',fontWeight:500}}>{t.description || 'No description'}</td>
+                    <td style={{padding:'12px',fontSize:'0.8rem',color:'var(--text-secondary)'}}>
+                      {t.lines.map((l, i) => (
+                        <div key={i}>
+                          {getAccountName(l.accountId)}: {formatCurrency(l.amount, currency)}
+                        </div>
+                      ))}
+                    </td>
+                    <td style={{padding:'12px',fontSize:'0.8rem'}}>
+                      {budget && (
+                        <span style={{padding:'2px 8px',borderRadius:4,fontSize:'0.75rem',background:'var(--accent)',color:'white',whiteSpace:'nowrap'}}>
+                          {budget.name}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{padding:'12px',fontSize:'0.8rem'}}>
+                      {t.tags && t.tags.length > 0 && (
+                        <div style={{display:'flex',flexWrap:'wrap',gap:4}}>
+                          {t.tags.map(tag => (
+                            <span key={tag} style={{padding:'2px 6px',background:'var(--accent-light)',color:'var(--text)',border:'1px solid var(--accent)',borderRadius:4,fontSize:'0.7rem',fontWeight:500,whiteSpace:'nowrap'}}>
+                              🏷️ {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{padding:'12px',fontSize:'0.875rem',color:'var(--text)',fontWeight:600,textAlign:'right',whiteSpace:'nowrap'}}>
+                      {t.lines.reduce((sum, l) => sum + l.amount, 0) >= 0 ? '+' : ''}{formatCurrency(t.lines.reduce((sum, l) => sum + l.amount, 0), currency)}
+                    </td>
+                    <td style={{padding:'12px',textAlign:'center',position:'relative'}}>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setOpenMenuId(openMenuId === t.id ? null : t.id)
+                        }}
+                        style={{padding:'4px 8px',fontSize:'1rem',background:'transparent',border:'none',cursor:'pointer',color:'var(--text)'}}
+                      >
+                        ⋮
+                      </button>
+                      {openMenuId === t.id && (
+                        <>
+                          <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:998}} 
+                            onClick={() => setOpenMenuId(null)}
+                          />
+                          <div style={{
+                            position:'absolute',
+                            right:0,
+                            top:'100%',
+                            background:'var(--bg-secondary)',
+                            border:'1px solid var(--border)',
+                            borderRadius:6,
+                            boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
+                            minWidth:160,
+                            zIndex:999,
+                            overflow:'hidden'
+                          }}>
+                            <button 
+                              onClick={() => {convertToRecurring(t); setOpenMenuId(null)}}
+                              style={{
+                                width:'100%',
+                                padding:'10px 16px',
+                                textAlign:'left',
+                                background:'var(--bg-secondary)',
+                                border:'none',
+                                cursor:'pointer',
+                                fontSize:'0.875rem',
+                                color:'var(--text)',
+                                display:'flex',
+                                alignItems:'center',
+                                gap:8
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                            >
+                              <span>🔁</span> Convert to Recurring
+                            </button>
+                            <button 
+                              onClick={() => {startEdit(t.id); setOpenMenuId(null)}}
+                              style={{
+                                width:'100%',
+                                padding:'10px 16px',
+                                textAlign:'left',
+                                background:'var(--bg-secondary)',
+                                border:'none',
+                                cursor:'pointer',
+                                fontSize:'0.875rem',
+                                color:'var(--text)',
+                                display:'flex',
+                                alignItems:'center',
+                                gap:8
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                            >
+                              <span>✏️</span> Edit
+                            </button>
+                            <button 
+                              onClick={() => {remove(t.id); setOpenMenuId(null)}}
+                              style={{
+                                width:'100%',
+                                padding:'10px 16px',
+                                textAlign:'left',
+                                background:'var(--bg-secondary)',
+                                border:'none',
+                                cursor:'pointer',
+                                fontSize:'0.875rem',
+                                color:'var(--danger)',
+                                display:'flex',
+                                alignItems:'center',
+                                gap:8,
+                                borderTop:'1px solid var(--border)'
+                              }}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                            >
+                              <span>🗑️</span> Delete
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
       <ul className="list">
         {filteredItems.map((t) => {
           const budget = getBudgetName(t.budgetId)
@@ -569,6 +761,7 @@ export default function TransactionsPage() {
         )
         })}
       </ul>
+      )}
         </>
       )}
     </div>

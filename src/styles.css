@@ -388,3 +388,106 @@ body.bottom-nav-mode .fab{
 body.bottom-nav-mode main{
   padding-bottom:70px;
 }
+
+/* React Tag Input Styling */
+.ReactTags__tags {
+  position: relative;
+}
+
+.ReactTags__tagInput {
+  width: 100%;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.ReactTags__tagInput input.ReactTags__tagInputField,
+.ReactTags__tagInput input.ReactTags__tagInputField:focus {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.ReactTags__tagInput input.ReactTags__tagInputField:focus {
+  border-color: var(--accent);
+}
+
+.ReactTags__selected {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.ReactTags__tag {
+  display: inline-flex;
+  align-items: center;
+  background: var(--accent-light);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ReactTags__remove {
+  margin-left: 6px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: var(--accent-dark);
+  font-size: 16px;
+  font-weight: bold;
+  padding: 0;
+  line-height: 1;
+}
+
+.ReactTags__remove:hover {
+  color: var(--danger);
+}
+
+.ReactTags__suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  margin-top: 4px;
+}
+
+.ReactTags__suggestions ul {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ReactTags__suggestions li {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.ReactTags__suggestions li mark {
+  background: var(--accent-light);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ReactTags__suggestions li.ReactTags__activeSuggestion {
+  background: var(--accent-light);
+}
+
+.ReactTags__suggestions li:hover {
+  background: var(--accent-light);
+}
