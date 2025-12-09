@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, Suspense } from 'react'
 import { db, Transaction, Account, Budget } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
-import React, { Suspense } from 'react'
 
 // ChartWrapper dynamically loads Chart.js and react-chartjs-2 and renders the requested chart
 function ChartWrapper({ type, ...props }: any) {
@@ -460,6 +459,67 @@ export default function ReportsPage() {
             ) : (
               <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No tagged transactions</div>
             )}
+          </div>
+
+          <div className="card" style={{marginTop: 12}}>
+            <h3 style={{marginTop: 0, marginBottom: 12}}>📂 Transactions by Budget</h3>
+            {(() => {
+              // Group filtered transactions by budgetId
+              const budgetTotals: Record<string, { name: string; income: number; expenses: number; count: number; budgetAmount?: number }> = {}
+              filteredTxs.forEach(tx => {
+                const bId = tx.budgetId || '___no_budget___'
+                if (!budgetTotals[bId]) {
+                  const b = budgets.find(bb => bb.id === tx.budgetId)
+                  budgetTotals[bId] = { name: b ? b.name : 'No Budget', income: 0, expenses: 0, count: 0, budgetAmount: b ? (b.amount as number | undefined) : undefined }
+                }
+                const entry = budgetTotals[bId]
+                const txNet = tx.lines.reduce((s, l) => s + l.amount, 0)
+                if (txNet >= 0) entry.income += txNet
+                else entry.expenses += Math.abs(txNet)
+                entry.count += 1
+              })
+
+              const entries = Object.entries(budgetTotals).sort((a, b) => b[1].expenses - a[1].expenses)
+              if (entries.length === 0) return <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No budgeted transactions</div>
+
+              return (
+                <div style={{overflowX: 'auto'}}>
+                  <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                    <thead>
+                      <tr style={{borderBottom: '2px solid var(--border)'}}>
+                        <th style={{textAlign: 'left', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Budget</th>
+                        <th style={{textAlign: 'right', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Trx</th>
+                        <th style={{textAlign: 'right', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Expenses</th>
+                        <th style={{textAlign: 'right', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Income</th>
+                        <th style={{textAlign: 'left', padding: '12px 8px', fontSize: '0.875rem', color: '#6b7280'}}>Budget</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entries.map(([bid, data]) => (
+                        <tr key={bid} style={{borderBottom: '1px solid var(--border)'}}>
+                          <td style={{padding: '12px 8px', fontWeight: 500}}>{data.name}</td>
+                          <td style={{padding: '12px 8px', textAlign: 'right', color: '#6b7280'}}>{data.count}</td>
+                          <td style={{padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: '#ef4444'}}>{formatCurrency(data.expenses, currency)}</td>
+                          <td style={{padding: '12px 8px', textAlign: 'right', fontWeight: 600, color: '#10b981'}}>{formatCurrency(data.income, currency)}</td>
+                          <td style={{padding: '12px 8px'}}>
+                            {typeof data.budgetAmount === 'number' ? (
+                              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                <div style={{flex:1,background:'var(--bg-secondary)',height:8,borderRadius:6,overflow:'hidden'}}>
+                                  <div style={{width: `${Math.min(100, Math.round((data.expenses / (data.budgetAmount || 1)) * 100))}%`, height: '100%', background: 'var(--accent)'}} />
+                                </div>
+                                <div style={{fontSize:'0.8rem',color:'var(--text-secondary)',whiteSpace:'nowrap'}}>{formatCurrency(data.budgetAmount, currency)}</div>
+                              </div>
+                            ) : (
+                              <div style={{fontSize:'0.875rem',color:'var(--text-secondary)'}}>—</div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
         </>
       )}
