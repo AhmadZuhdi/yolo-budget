@@ -124,6 +124,8 @@ export default function TransactionsPage() {
   async function create() {
     if (!lineA.accountId) return
     
+    const isEditing = !!editingId
+
     const aAmt = Number(lineA.amount || 0)
     
     if (doubleEntry) {
@@ -159,10 +161,18 @@ export default function TransactionsPage() {
         }
         setItems(await db.getAll('transactions'))
         setDesc('')
-        setBudgetId('')
         setTags([])
-        setLineA({})
-        setLineB({})
+        if (!isEditing) {
+          const defAcc = await db.getMeta<string>('defaultAccountId')
+          const defBud = await db.getMeta<string>('defaultBudgetId')
+          setLineA({ accountId: defAcc || undefined })
+          setBudgetId(defBud || '')
+          setLineB({})
+        } else {
+          setBudgetId('')
+          setLineA({})
+          setLineB({})
+        }
       } catch (e: any) {
         alert(e.message)
       }
@@ -204,10 +214,18 @@ export default function TransactionsPage() {
         }
         setItems(await db.getAll('transactions'))
         setDesc('')
-        setBudgetId('')
         setTags([])
-        setLineA({})
-        setLineB({})
+        if (!isEditing) {
+          const defAcc = await db.getMeta<string>('defaultAccountId')
+          const defBud = await db.getMeta<string>('defaultBudgetId')
+          setLineA({ accountId: defAcc || undefined })
+          setBudgetId(defBud || '')
+          setLineB({})
+        } else {
+          setBudgetId('')
+          setLineA({})
+          setLineB({})
+        }
       } catch (e: any) {
         alert(e.message)
       }
