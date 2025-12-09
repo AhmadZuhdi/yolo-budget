@@ -25,6 +25,7 @@ export default function TransactionsPage() {
   const [date, setDate] = useState(new Date().toISOString().slice(0,10))
   const [budgetId, setBudgetId] = useState('')
   const [tags, setTags] = useState<Tag[]>([])
+  const [tagInputValue, setTagInputValue] = useState('')
   const [lineA, setLineA] = useState<{accountId?:string;amount?:number}>({})
   const [lineB, setLineB] = useState<{accountId?:string;amount?:number}>({})
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -349,6 +350,33 @@ export default function TransactionsPage() {
             autofocus={false}
             allowDragDrop={false}
             inputFieldPosition="top"
+            inputAttributes={{
+              value: tagInputValue,
+              onChange: (e: any) => {
+                const v = e.target.value
+                setTagInputValue(v)
+                // if on mobile keyboards pressing space doesn't always trigger keydown for delimiters
+                // so split on space or comma as user types
+                if (/[ ,]$/.test(v)) {
+                  const cleaned = v.trim().replace(/,$/, '')
+                  if (cleaned) {
+                    setTags(prev => [...prev, { id: String(Date.now()), text: cleaned }])
+                  }
+                  setTagInputValue('')
+                }
+              },
+              onBlur: (e: any) => {
+                const v = e.target.value.trim()
+                if (v) {
+                  // may contain multiple tags separated by spaces or commas
+                  const parts = v.split(/[ ,]+/).map(s => s.trim()).filter(Boolean)
+                  if (parts.length > 0) {
+                    setTags(prev => [...prev, ...parts.map(p => ({ id: String(Date.now() + Math.random()), text: p }))])
+                  }
+                }
+                setTagInputValue('')
+              }
+            }}
           />
         </div>
         <div style={{display:'flex',gap:8,marginTop:8}}>
