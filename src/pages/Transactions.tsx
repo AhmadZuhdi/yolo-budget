@@ -9,7 +9,12 @@ const KeyCodes = {
   enter: 13
 }
 
-const delimiters = [KeyCodes.comma, KeyCodes.enter]
+const KeyCodesExtended = {
+  ...KeyCodes,
+  space: 32
+}
+
+const delimiters = [KeyCodesExtended.comma, KeyCodesExtended.enter, KeyCodesExtended.space]
 
 export default function TransactionsPage() {
   const navigate = useNavigate()
@@ -339,7 +344,8 @@ export default function TransactionsPage() {
             handleDelete={(i: number) => setTags(tags.filter((tag, index) => index !== i))}
             handleAddition={(tag: Tag) => setTags([...tags, tag])}
             suggestions={getAllTags().map((t, idx) => ({ id: String(idx), text: t }))}
-            placeholder="Add tag (press Enter)"
+            placeholder="Add tag (press Enter or Space)"
+            delimiters={delimiters}
             autofocus={false}
             allowDragDrop={false}
             inputFieldPosition="top"
