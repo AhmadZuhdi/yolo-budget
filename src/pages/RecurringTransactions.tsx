@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
+import { WithContext as ReactTags, Tag } from 'react-tag-input'
 import { useLocation } from 'react-router-dom'
 import { db, RecurringTransaction, Account } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
+import { getAllTagsFromItems } from '../utils/tags'
 
 export default function RecurringTransactionsPage() {
   const location = useLocation()
@@ -12,6 +14,22 @@ export default function RecurringTransactionsPage() {
   
   // Form state
   const [description, setDescription] = useState('')
+  const [tags, setTags] = useState<Tag[]>([])
+  const [tagInputValue, setTagInputValue] = useState('')
+
+  function addTagsFromInput() {
+    // Read from controlled state or fall back to DOM input used by ReactTags
+    const domInput = document.querySelector('.ReactTags__tagInputField') as HTMLInputElement | null
+    const raw = (tagInputValue && tagInputValue.length > 0) ? tagInputValue : (domInput ? domInput.value : '')
+    const v = (raw || '').trim()
+    if (!v) return
+    const parts = v.split(/[ ,]+/).map(s => s.trim()).filter(Boolean)
+    if (parts.length > 0) {
+      setTags(prev => [...prev, ...parts.map(p => ({ id: String(Date.now() + Math.random()), text: p }))])
+    }
+    setTagInputValue('')
+    if (domInput) domInput.value = ''
+  }
   const [frequency, setFrequency] = useState<RecurringTransaction['frequency']>('monthly')
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
   const [endDate, setEndDate] = useState('')
@@ -34,6 +52,15 @@ export default function RecurringTransactionsPage() {
         setLineB({ accountId: lines[1].accountId, amount: lines[1].amount })
       }
     }
+  }, [])
+
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  useEffect(() => {
+    let mounted = true
+    db.getAll('transactions').then((txs: any[]) => {
+      if (mounted) setTagSuggestions(getAllTagsFromItems(txs))
+    })
+    return () => { mounted = false }
   }, [])
 
   async function loadData() {
@@ -76,6 +103,7 @@ export default function RecurringTransactionsPage() {
       frequency,
       startDate,
       endDate: endDate || undefined,
+      tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
       lines: doubleEntry && lineB.accountId
         ? [
             { accountId: lineA.accountId!, amount: aAmt },
@@ -92,6 +120,7 @@ export default function RecurringTransactionsPage() {
 
   function resetForm() {
     setDescription('')
+    setTags([])
     setFrequency('monthly')
     setStartDate(new Date().toISOString().slice(0, 10))
     setEndDate('')
@@ -103,6 +132,7 @@ export default function RecurringTransactionsPage() {
   function startEdit(r: RecurringTransaction) {
     setEditingId(r.id)
     setDescription(r.description)
+    setTags(r.tags ? r.tags.map((t, i) => ({ id: String(i), text: t })) : [])
     setFrequency(r.frequency)
     setStartDate(r.startDate)
     setEndDate(r.endDate || '')
@@ -159,6 +189,35 @@ export default function RecurringTransactionsPage() {
               onChange={(e) => setDescription(e.target.value)}
               style={{marginBottom: 8, width: '100%'}}
             />
+            <div style={{marginTop:8, display:'flex', alignItems:'flex-start', gap:8}}>
+              <div style={{flex:1}}>
+                <ReactTags
+                  tags={tags}
+                  handleDelete={(i: number) => setTags(tags.filter((tag, index) => index !== i))}
+                  handleAddition={(tag: Tag) => setTags([...tags, tag])}
+                  suggestions={tagSuggestions.map((t, idx) => ({ id: String(idx), text: t }))}
+                  placeholder="Add tag (press Enter)"
+                  autofocus={false}
+                  allowDragDrop={false}
+                  inputFieldPosition="top"
+                  inputAttributes={{
+                    value: tagInputValue,
+                    onChange: (e: any) => setTagInputValue(e.target.value),
+                    onBlur: (e: any) => {
+                      const v = e.target.value.trim()
+                      if (v) {
+                        const parts = v.split(/[ ,]+/).map(s => s.trim()).filter(Boolean)
+                        if (parts.length > 0) setTags(prev => [...prev, ...parts.map(p => ({ id: String(Date.now() + Math.random()), text: p }))])
+                      }
+                      setTagInputValue('')
+                    }
+                  }}
+                />
+              </div>
+              <div style={{display:'flex',alignItems:'center'}}>
+                <button onClick={addTagsFromInput} className="button-primary" style={{height:36,display:'flex',alignItems:'center',gap:8}}>➕ Add tag</button>
+              </div>
+            </div>
             
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginBottom: 8}}>
               <select value={frequency} onChange={(e) => setFrequency(e.target.value as any)} style={{width: '100%'}}>

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { db, Transaction, TransactionLine, Account, Budget } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
+import { getAllTagsFromItems } from '../utils/tags'
 import { WithContext as ReactTags, Tag } from 'react-tag-input'
 
 const KeyCodes = {
@@ -26,6 +27,20 @@ export default function TransactionsPage() {
   const [budgetId, setBudgetId] = useState('')
   const [tags, setTags] = useState<Tag[]>([])
   const [tagInputValue, setTagInputValue] = useState('')
+
+  function addTagsFromInput() {
+    // try the controlled value first, fall back to reading the actual DOM input used by ReactTags
+    const domInput = document.querySelector('.ReactTags__tagInputField') as HTMLInputElement | null
+    const raw = (tagInputValue && tagInputValue.length > 0) ? tagInputValue : (domInput ? domInput.value : '')
+    const v = (raw || '').trim()
+    if (!v) return
+    const parts = v.split(/[ ,]+/).map(s => s.trim()).filter(Boolean)
+    if (parts.length > 0) {
+      setTags(prev => [...prev, ...parts.map(p => ({ id: String(Date.now() + Math.random()), text: p }))])
+    }
+    setTagInputValue('')
+    if (domInput) domInput.value = ''
+  }
   const [lineA, setLineA] = useState<{accountId?:string;amount?:number}>({})
   const [lineB, setLineB] = useState<{accountId?:string;amount?:number}>({})
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -89,16 +104,8 @@ export default function TransactionsPage() {
     return budgets.find(b => b.id === budgetId)
   }
 
-  // Get all unique tags from transactions
-  const getAllTags = (): string[] => {
-    const tagSet = new Set<string>()
-    items.forEach(t => {
-      if (t.tags) {
-        t.tags.forEach(tag => tagSet.add(tag))
-      }
-    })
-    return Array.from(tagSet).sort()
-  }
+  // Get all unique tags from transactions (shared util)
+  const getAllTags = () => getAllTagsFromItems(items)
 
   const filteredItems = items.filter(t => {
     const matchesSearch = !searchTerm || 
@@ -339,8 +346,9 @@ export default function TransactionsPage() {
           <option value="">No budget</option>
           {budgets.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
         </select>
-        <div style={{marginTop:8}}>
-          <ReactTags
+        <div style={{marginTop:8, display:'flex', alignItems:'flex-start', gap:8}}>
+          <div style={{flex:1}}>
+            <ReactTags
             tags={tags}
             handleDelete={(i: number) => setTags(tags.filter((tag, index) => index !== i))}
             handleAddition={(tag: Tag) => setTags([...tags, tag])}
@@ -353,17 +361,7 @@ export default function TransactionsPage() {
             inputAttributes={{
               value: tagInputValue,
               onChange: (e: any) => {
-                const v = e.target.value
-                setTagInputValue(v)
-                // if on mobile keyboards pressing space doesn't always trigger keydown for delimiters
-                // so split on space or comma as user types
-                if (/[ ,]$/.test(v)) {
-                  const cleaned = v.trim().replace(/,$/, '')
-                  if (cleaned) {
-                    setTags(prev => [...prev, { id: String(Date.now()), text: cleaned }])
-                  }
-                  setTagInputValue('')
-                }
+                setTagInputValue(e.target.value)
               },
               onBlur: (e: any) => {
                 const v = e.target.value.trim()
@@ -377,7 +375,11 @@ export default function TransactionsPage() {
                 setTagInputValue('')
               }
             }}
-          />
+            />
+          </div>
+          <div style={{display:'flex',alignItems:'center'}}>
+            <button onClick={addTagsFromInput} className="button-primary" style={{height:36,display:'flex',alignItems:'center',gap:8}}>➕ Add tag</button>
+          </div>
         </div>
         <div style={{display:'flex',gap:8,marginTop:8}}>
           <select onChange={(e)=>setLineA(s=>({...s,accountId:e.target.value}))} value={lineA.accountId||''}>
