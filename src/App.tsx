@@ -1,13 +1,15 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, Suspense } from 'react'
 import { Routes, Route, Link } from 'react-router-dom'
-import AccountsPage from './pages/Accounts'
-import BudgetsPage from './pages/Budgets'
-import TransactionsPage from './pages/Transactions'
-import DashboardPage from './pages/Dashboard'
-import RecurringTransactionsPage from './pages/RecurringTransactions'
-import ReportsPage from './pages/Reports'
 import Nav from './components/Nav'
-import SettingsPage from './pages/Settings'
+
+// Lazy-loaded pages to enable code-splitting
+const AccountsPage = React.lazy(() => import('./pages/Accounts'))
+const BudgetsPage = React.lazy(() => import('./pages/Budgets'))
+const TransactionsPage = React.lazy(() => import('./pages/Transactions'))
+const DashboardPage = React.lazy(() => import('./pages/Dashboard'))
+const RecurringTransactionsPage = React.lazy(() => import('./pages/RecurringTransactions'))
+const ReportsPage = React.lazy(() => import('./pages/Reports'))
+const SettingsPage = React.lazy(() => import('./pages/Settings'))
 import { db } from './db/indexeddb'
 
 export default function App() {
@@ -51,15 +53,17 @@ export default function App() {
         <h1>Yolo Budget</h1>
       </header>
       <main>
-        <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/accounts" element={<AccountsPage />} />
-          <Route path="/budgets" element={<BudgetsPage />} />
-          <Route path="/transactions" element={<TransactionsPage />} />
-          <Route path="/recurring" element={<RecurringTransactionsPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Routes>
+        <Suspense fallback={<div className="card" style={{padding:20}}>Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/budgets" element={<BudgetsPage />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
+            <Route path="/recurring" element={<RecurringTransactionsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Routes>
+        </Suspense>
       </main>
       <Link to="/transactions" className="fab" aria-label="Create transaction">
         <span>+</span>

@@ -49,4 +49,21 @@ export default defineConfig({
       }
     })
   ]
+  ,
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id || !id.includes('node_modules')) return undefined
+          if (id.includes('react') || id.includes('react-dom')) return 'react-vendor'
+          if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'charts-vendor'
+          if (id.includes('react-tag-input')) return 'tags-vendor'
+          if (id.includes('workbox') || id.includes('vite-plugin-pwa')) return 'pwa-vendor'
+          if (id.includes('firebase') || id.includes('@firebase')) return 'firebase-vendor'
+          if (id.includes('idb') || id.includes('idb-keyval')) return 'idb-vendor'
+          return 'vendor'
+        }
+      }
+    }
+  }
 })

@@ -1,10 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import { db, Transaction, Account } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
-import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js'
-import { Bar, Pie } from 'react-chartjs-2'
+// ChartWrapper dynamically loads Chart.js and react-chartjs-2 when charts are shown
+function ChartWrapper({ type, ...props }: any) {
+  const LazyComp = React.lazy(async () => {
+    const ChartJS = await import('chart.js')
+    const { ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } = ChartJS
+    // @ts-ignore
+    ChartJS.Chart.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+    const libs = await import('react-chartjs-2')
+    const comp = libs[type]
+    return { default: comp }
+  })
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
+  return (
+    <React.Suspense fallback={<div style={{padding:20}}>Loading chart...</div>}>
+      {/* @ts-ignore */}
+      <LazyComp {...props} />
+    </React.Suspense>
+  )
+}
 
 export default function DashboardPage() {
   const [tx, setTx] = useState<Transaction[]>([])
@@ -113,7 +128,7 @@ export default function DashboardPage() {
                   <h4 style={{marginTop: 0, fontSize: '1rem'}}>Transaction History</h4>
                   <div className="chart">
                     {labels.length > 0 ? (
-                      <Bar data={data} />
+                      <ChartWrapper type="Bar" data={data} />
                     ) : (
                       <div style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>No transactions yet</div>
                     )}
@@ -124,7 +139,7 @@ export default function DashboardPage() {
                   <h4 style={{marginTop: 0, fontSize: '1rem'}}>Account Distribution</h4>
                   <div style={{maxWidth: 250, margin: '0 auto', padding: '20px 0'}}>
                     {accounts.filter(a => (a.balance || 0) > 0).length > 0 ? (
-                      <Pie data={accountData} />
+                      <ChartWrapper type="Pie" data={accountData} />
                     ) : (
                       <div style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>No account balances</div>
                     )}

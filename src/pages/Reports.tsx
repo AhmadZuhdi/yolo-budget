@@ -1,10 +1,27 @@
 import React, { useEffect, useState } from 'react'
 import { db, Transaction, Account, Budget } from '../db/indexeddb'
 import { formatCurrency } from '../utils/currency'
-import { Chart as ChartJS, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js'
-import { Pie, Bar, Line } from 'react-chartjs-2'
+import React, { Suspense } from 'react'
 
-ChartJS.register(ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend)
+// ChartWrapper dynamically loads Chart.js and react-chartjs-2 and renders the requested chart
+function ChartWrapper({ type, ...props }: any) {
+  const LazyComp = React.lazy(async () => {
+    const ChartJS = await import('chart.js')
+    const { ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } = ChartJS
+    // @ts-ignore
+    ChartJS.Chart.register(ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend)
+    const libs = await import('react-chartjs-2')
+    const comp = libs[type]
+    return { default: comp }
+  })
+
+  return (
+    <Suspense fallback={<div style={{padding:20}}>Loading chart...</div>}>
+      {/* @ts-ignore */}
+      <LazyComp {...props} />
+    </Suspense>
+  )
+}
 
 export default function ReportsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -344,7 +361,7 @@ export default function ReportsPage() {
             <div className="card">
               <h3 style={{marginTop: 0, marginBottom: 12}}>Income vs Expenses</h3>
               <div style={{maxWidth: 300, margin: '0 auto'}}>
-                <Pie data={incomeExpenseData} />
+                <ChartWrapper type="Pie" data={incomeExpenseData} />
               </div>
             </div>
 
@@ -352,7 +369,7 @@ export default function ReportsPage() {
               <h3 style={{marginTop: 0, marginBottom: 12}}>Account Balances</h3>
               <div style={{maxWidth: 300, margin: '0 auto'}}>
                 {accounts.length > 0 ? (
-                  <Pie data={accountBalanceData} />
+                  <ChartWrapper type="Pie" data={accountBalanceData} />
                 ) : (
                   <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No accounts</div>
                 )}
@@ -363,7 +380,7 @@ export default function ReportsPage() {
               <h3 style={{marginTop: 0, marginBottom: 12}}>Spending by Account</h3>
               <div style={{maxWidth: 300, margin: '0 auto'}}>
                 {Object.keys(spendingByAccount).length > 0 ? (
-                  <Pie data={spendingData} />
+                  <ChartWrapper type="Pie" data={spendingData} />
                 ) : (
                   <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No spending data</div>
                 )}
@@ -374,7 +391,7 @@ export default function ReportsPage() {
           <div className="card" style={{marginTop: 12}}>
             <h3 style={{marginTop: 0, marginBottom: 12}}>Transaction Trend</h3>
             {sortedDates.length > 0 ? (
-              <Line data={trendData} options={{maintainAspectRatio: true, responsive: true}} />
+              <ChartWrapper type="Line" data={trendData} options={{maintainAspectRatio: true, responsive: true}} />
             ) : (
               <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>No transaction data</div>
             )}
