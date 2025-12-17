@@ -137,6 +137,26 @@ Budgets automatically track spending from transactions assigned to them. When cr
 - Red: Over budget
 - Percentage of budget used
 
+### Transaction Management
+The transaction page includes powerful filtering and pagination features:
+
+**Filtering**
+- **Search** — Find transactions by description or date
+- **Filter by Account** — Show only transactions from specific accounts
+- **Filter by Budget** — Show only transactions assigned to specific budgets
+- **Filter by Tags** — Filter transactions by any assigned tag
+
+**Pagination**
+- **Configurable page size** — Choose 5, 10, 20, 50, or 100 items per page
+- **Page navigation** — Use Previous/Next buttons or click page numbers directly
+- **Transaction counter** — Shows current range (e.g., "1–10 of 234")
+- **Auto-reset** — Pagination automatically resets to page 1 when filters change
+
+**Form Validation**
+- Amount cannot be 0 (prevents invalid transactions)
+- Both lineA and lineB amounts validated in double-entry mode
+- Default account and budget automatically reset after successful transaction creation or update
+
 ### Quick Transaction Defaults
 Save time when creating transactions by setting default values in Settings:
 - **Default Account** — Pre-fills the account field when creating new transactions
@@ -168,9 +188,13 @@ These settings are optional and can be changed on a per-transaction basis.
 - ✅ Create/edit/delete transactions
 - ✅ Search by description or date
 - ✅ Filter by account
+- ✅ Filter by budget
 - ✅ Filter by tags
 - ✅ Budget assignment per transaction
 - ✅ Transaction tags support
+- ✅ Transaction pagination (configurable: 5, 10, 20, 50, 100 items per page)
+- ✅ Amount validation (cannot be 0)
+- ✅ Fixed form reset to defaults after updating transaction
 
 **Reports & Analytics**
 - ✅ Income vs expenses analysis
@@ -197,6 +221,7 @@ These settings are optional and can be changed on a per-transaction basis.
 
 **Developer Tools**
 - ✅ Version bump CLI (major, minor, patch)
+- ✅ Build timestamp appended to version (Unix timestamp)
 - ✅ Firebase hosting configuration
 - ✅ Deployment scripts
 
