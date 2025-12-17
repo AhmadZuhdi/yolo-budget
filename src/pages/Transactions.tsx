@@ -50,6 +50,7 @@ export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterAccount, setFilterAccount] = useState('')
   const [filterTag, setFilterTag] = useState('')
+  const [filterBudget, setFilterBudget] = useState('')
   
   // Collapsible sections state
   const [showCreateForm, setShowCreateForm] = useState(true)
@@ -57,6 +58,10 @@ export default function TransactionsPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
   
   // Transfer state
   const [transferFrom, setTransferFrom] = useState('')
@@ -115,11 +120,28 @@ export default function TransactionsPage() {
       t.lines.some(l => l.accountId === filterAccount)
     const matchesTag = !filterTag ||
       (t.tags && t.tags.some(tag => tag.toLowerCase().includes(filterTag.toLowerCase())))
-    return matchesSearch && matchesAccount && matchesTag
+    const matchesBudget = !filterBudget ||
+      t.budgetId === filterBudget
+    return matchesSearch && matchesAccount && matchesTag && matchesBudget
   }).sort((a, b) => {
     // Sort by date descending (newest first)
     return b.date.localeCompare(a.date) || b.id.localeCompare(a.id)
   })
+
+  // Reset to page 1 when filters change
+  const [prevFilterLength, setPrevFilterLength] = useState(filteredItems.length)
+  useEffect(() => {
+    if (filteredItems.length !== prevFilterLength) {
+      setCurrentPage(1)
+      setPrevFilterLength(filteredItems.length)
+    }
+  }, [filteredItems.length, prevFilterLength])
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedItems = filteredItems.slice(startIndex, endIndex)
 
   async function create() {
     if (!lineA.accountId) return
@@ -128,6 +150,12 @@ export default function TransactionsPage() {
 
     const aAmt = Number(lineA.amount || 0)
     
+    // Validation: amount must not be 0
+    if (aAmt === 0) {
+      alert('Amount cannot be 0')
+      return
+    }
+    
     if (doubleEntry) {
       // Double-entry mode: require both accounts and balanced transaction
       if (!lineB.accountId) {
@@ -135,6 +163,13 @@ export default function TransactionsPage() {
         return
       }
       const bAmt = Number(lineB.amount || 0)
+      
+      // Validation: amount B must not be 0
+      if (bAmt === 0) {
+        alert('Amount cannot be 0')
+        return
+      }
+      
       if (Math.abs(aAmt + bAmt) > 1e-6) {
         alert('Transaction must balance (sum of lines = 0)')
         return
@@ -162,17 +197,11 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setTags([])
-        if (!isEditing) {
-          const defAcc = await db.getMeta<string>('defaultAccountId')
-          const defBud = await db.getMeta<string>('defaultBudgetId')
-          setLineA({ accountId: defAcc || undefined })
-          setBudgetId(defBud || '')
-          setLineB({})
-        } else {
-          setBudgetId('')
-          setLineA({})
-          setLineB({})
-        }
+        const defAcc = await db.getMeta<string>('defaultAccountId')
+        const defBud = await db.getMeta<string>('defaultBudgetId')
+        setLineA({ accountId: defAcc || undefined })
+        setBudgetId(defBud || '')
+        setLineB({})
       } catch (e: any) {
         alert(e.message)
       }
@@ -215,17 +244,11 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setTags([])
-        if (!isEditing) {
-          const defAcc = await db.getMeta<string>('defaultAccountId')
-          const defBud = await db.getMeta<string>('defaultBudgetId')
-          setLineA({ accountId: defAcc || undefined })
-          setBudgetId(defBud || '')
-          setLineB({})
-        } else {
-          setBudgetId('')
-          setLineA({})
-          setLineB({})
-        }
+        const defAcc = await db.getMeta<string>('defaultAccountId')
+        const defBud = await db.getMeta<string>('defaultBudgetId')
+        setLineA({ accountId: defAcc || undefined })
+        setBudgetId(defBud || '')
+        setLineB({})
       } catch (e: any) {
         alert(e.message)
       }
@@ -535,12 +558,105 @@ export default function TransactionsPage() {
           <option value="">All accounts</option>
           {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
+        <select value={filterBudget} onChange={(e)=>setFilterBudget(e.target.value)} style={{marginBottom:8}}>
+          <option value="">All budgets</option>
+          {budgets.map(b=> <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
         <select value={filterTag} onChange={(e)=>setFilterTag(e.target.value)}>
           <option value="">All tags</option>
           {getAllTags().map(tag=> <option key={tag} value={tag}>{tag}</option>)}
         </select>
           </>
         )}
+      </div>
+
+      <div className="card" style={{marginBottom:12, padding:'12px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', gap:12, flexWrap:'wrap'}}>
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <label style={{fontSize:'0.875rem', color:'var(--text-secondary)', fontWeight:500}}>Items per page:</label>
+            <select 
+              value={itemsPerPage} 
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value))
+                setCurrentPage(1)
+              }}
+              style={{padding:'6px 8px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:'0.875rem'}}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+
+          <div style={{display:'flex', alignItems:'center', gap:8}}>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              style={{
+                padding:'6px 12px',
+                border:'1px solid var(--border)',
+                borderRadius:4,
+                background:'var(--bg)',
+                color:'var(--text)',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                opacity: currentPage === 1 ? 0.5 : 1,
+                fontSize:'0.875rem',
+                fontWeight:500,
+                transition:'all 0.2s'
+              }}
+            >
+              ← Previous
+            </button>
+            
+            <div style={{display:'flex', gap:4, alignItems:'center'}}>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  style={{
+                    padding:'6px 10px',
+                    border: currentPage === page ? '2px solid var(--accent)' : '1px solid var(--border)',
+                    borderRadius:4,
+                    background: currentPage === page ? 'var(--accent)' : 'var(--bg)',
+                    color: currentPage === page ? 'white' : 'var(--text)',
+                    cursor:'pointer',
+                    fontSize:'0.875rem',
+                    fontWeight: currentPage === page ? 600 : 400,
+                    transition:'all 0.2s',
+                    minWidth:'40px'
+                  }}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              style={{
+                padding:'6px 12px',
+                border:'1px solid var(--border)',
+                borderRadius:4,
+                background:'var(--bg)',
+                color:'var(--text)',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer',
+                opacity: currentPage === totalPages ? 0.5 : 1,
+                fontSize:'0.875rem',
+                fontWeight:500,
+                transition:'all 0.2s'
+              }}
+            >
+              Next →
+            </button>
+          </div>
+
+          <div style={{fontSize:'0.875rem', color:'var(--text-secondary)', fontWeight:500}}>
+            {filteredItems.length === 0 ? 'No transactions' : `${startIndex + 1}–${Math.min(endIndex, filteredItems.length)} of ${filteredItems.length}`}
+          </div>
+        </div>
       </div>
 
       {viewMode === 'table' ? (
@@ -558,7 +674,7 @@ export default function TransactionsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((t) => {
+              {paginatedItems.map((t) => {
                 const budget = getBudgetName(t.budgetId)
                 return (
                   <tr key={t.id} style={{borderBottom:'1px solid var(--border)'}}>
@@ -692,7 +808,7 @@ export default function TransactionsPage() {
         </div>
       ) : (
       <ul className="list">
-        {filteredItems.map((t) => {
+        {paginatedItems.map((t) => {
           const budget = getBudgetName(t.budgetId)
           return (
           <li key={t.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 12px'}}>

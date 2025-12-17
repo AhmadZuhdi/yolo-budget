@@ -262,7 +262,7 @@ export default function SettingsPage() {
       <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24}}>
         <h2 style={{fontSize: '1.75rem', fontWeight: 700, margin: 0}}>Settings</h2>
         <span style={{fontSize: '0.875rem', color: 'var(--text-secondary)', padding: '4px 12px', background: 'var(--accent-light)', borderRadius: 16}}>
-          v{packageJson.version}
+          v{packageJson.version}{import.meta.env.PROD ? `-${__BUILD_TIME__}` : '-dev'}
         </span>
       </div>
       {loading ? (
