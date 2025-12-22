@@ -98,86 +98,120 @@ export default function BudgetsPage() {
 
   return (
     <div className="page container">
-      <h2>💰 Budgets</h2>
+      <h2 style={{marginBottom: 24, fontSize: '1.75rem', fontWeight: 700}}>💰 Budgets</h2>
       {loading ? (
-        <div className="card" style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>Loading budgets...</div>
+        <div className="card" style={{padding: 40, textAlign: 'center', color: '#6b7280'}}>
+          <div style={{fontSize: '2rem', marginBottom: 8}}>⏳</div>
+          Loading budgets...
+        </div>
       ) : (
         <>
-      <div className="card" style={{marginBottom:12}}>
-        <h3 style={{marginTop: 0, marginBottom: 12}}>{editingId ? '✏️ Edit Budget' : '➕ Create Budget'}</h3>
-        <input placeholder="Name" value={name} onChange={(e)=>setName(e.target.value)} />
-        <input placeholder="Amount" type="number" value={amount} onChange={(e)=>setAmount(Number(e.target.value))} />
-        {editingId ? (
-          <div style={{display: 'flex', gap: 8}}>
-            <button onClick={saveEdit} className="button-primary">💾 Save</button>
-            <button onClick={()=>{setEditingId(null); setName(''); setAmount(0)}} className="button-secondary">❌ Cancel</button>
+      <div className="card" style={{marginBottom: 20}}>
+        <h3 style={{marginTop: 0, marginBottom: 16}}>{editingId ? '✏️ Edit Budget' : '➕ Add New Budget'}</h3>
+        <div style={{display: 'grid', gap: 12}}>
+          <div>
+            <label>Budget Name</label>
+            <input placeholder="e.g., Groceries, Entertainment" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
-        ) : (
-          <button onClick={create} className="button-primary">➕ Add Budget</button>
-        )}
+          <div>
+            <label>Budget Amount</label>
+            <input placeholder="Amount" type="number" value={amount} onChange={(e) => setAmount(Number(e.target.value))} />
+          </div>
+          {editingId ? (
+            <div style={{display: 'flex', gap: 8}}>
+              <button onClick={saveEdit} className="button-primary">💾 Save</button>
+              <button onClick={() => {setEditingId(null); setName(''); setAmount(0)}} className="button-secondary">❌ Cancel</button>
+            </div>
+          ) : (
+            <button onClick={create} style={{marginTop: 8}}>➕ Add Budget</button>
+          )}
+        </div>
       </div>
 
-      <ul className="list">
-        {items.map((b) => {
-          const spending = getSpending(b.id)
-          const percentage = Math.min((spending / b.amount) * 100, 100)
-          const isOverBudget = spending > b.amount
-          
-          return (
-          <li key={b.id} style={{padding:'8px 12px'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:'0.875rem',fontWeight:500,marginBottom:2}}>{b.name}</div>
-                <div style={{fontSize:'0.75rem',color:'#6b7280'}}>
+      <div className="card">
+        <ul className="list">
+          {items.map((b) => {
+            const spending = getSpending(b.id)
+            const percentage = (spending / b.amount) * 100
+            const isOverBudget = spending > b.amount
+            const difference = spending - b.amount
+            const progressBarWidth = Math.min(percentage, 100)
+            
+            return (
+            <li key={b.id} style={{padding:'12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: items.length > 0 ? 12 : 0}}>
+              <div style={{flex: 1, minWidth: 0}}>
+                <div style={{fontSize: '0.9rem', fontWeight: 500, marginBottom: 8}}>{b.name}</div>
+                <div style={{fontSize: '0.75rem', color: '#6b7280', marginBottom: 6}}>
                   <span style={{color: isOverBudget ? '#ef4444' : '#10b981', fontWeight: 500}}>
                     {formatCurrency(spending, currency)}
                   </span>
                   {' '} of {formatCurrency(b.amount, currency)}
-                  {' '}({percentage.toFixed(0)}%)
+                  {isOverBudget ? (
+                    <>
+                      {' '}({percentage.toFixed(0)}%) <span style={{color: '#ef4444', fontWeight: 500}}>+{formatCurrency(difference, currency)} over</span>
+                    </>
+                  ) : (
+                    <>
+                      {' '}({percentage.toFixed(0)}%)
+                    </>
+                  )}
+                </div>
+                <div style={{
+                  height: 6,
+                  background: '#e5e7eb',
+                  borderRadius: 3,
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${progressBarWidth}%`,
+                    background: isOverBudget ? '#ef4444' : '#10b981',
+                    transition: 'width 0.3s ease'
+                  }} />
                 </div>
               </div>
-              <div style={{position:'relative',flexShrink:0}}>
+              <div style={{position: 'relative', flexShrink: 0, marginLeft: 12}}>
                 <button 
                   onClick={(e) => {
                     e.stopPropagation()
                     setOpenMenuId(openMenuId === b.id ? null : b.id)
                   }}
-                  style={{padding:'6px 12px',fontSize:'1rem',background:'transparent',border:'none',cursor:'pointer'}}
+                  style={{padding: '6px 12px', fontSize: '1rem', background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text)'}}
                 >
                   ⋮
                 </button>
                 {openMenuId === b.id && (
                   <>
                     <div 
-                      style={{position:'fixed',top:0,left:0,right:0,bottom:0,zIndex:998}} 
+                      style={{position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 998}} 
                       onClick={() => setOpenMenuId(null)}
                     />
                     <div style={{
-                      position:'absolute',
-                      right:0,
-                      top:'100%',
-                      background:'var(--bg-secondary)',
-                      border:'1px solid var(--border)',
-                      borderRadius:6,
-                      boxShadow:'0 4px 6px rgba(0,0,0,0.1)',
-                      minWidth:140,
-                      zIndex:999,
-                      overflow:'hidden'
+                      position: 'absolute',
+                      right: 0,
+                      top: '100%',
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 6,
+                      boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                      minWidth: 140,
+                      zIndex: 999,
+                      overflow: 'hidden'
                     }}>
                       <button 
                         onClick={() => {startEdit(b); setOpenMenuId(null)}}
                         style={{
-                          width:'100%',
-                          padding:'10px 16px',
-                          textAlign:'left',
-                          background:'var(--bg-secondary)',
-                          border:'none',
-                          cursor:'pointer',
-                          fontSize:'0.875rem',
-                          color:'var(--text)',
-                          display:'flex',
-                          alignItems:'center',
-                          gap:8
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'var(--bg-secondary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          color: 'var(--text)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
@@ -187,18 +221,18 @@ export default function BudgetsPage() {
                       <button 
                         onClick={() => {remove(b.id); setOpenMenuId(null)}}
                         style={{
-                          width:'100%',
-                          padding:'10px 16px',
-                          textAlign:'left',
-                          background:'var(--bg-secondary)',
-                          border:'none',
-                          cursor:'pointer',
-                          fontSize:'0.875rem',
-                          color:'var(--danger)',
-                          display:'flex',
-                          alignItems:'center',
-                          gap:8,
-                          borderTop:'1px solid var(--border)'
+                          width: '100%',
+                          padding: '10px 16px',
+                          textAlign: 'left',
+                          background: 'var(--bg-secondary)',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.875rem',
+                          color: 'var(--danger)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          borderTop: '1px solid var(--border)'
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
                         onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
@@ -209,35 +243,46 @@ export default function BudgetsPage() {
                   </>
                 )}
               </div>
-            </div>
-            
-            <div style={{
-              height: 6,
-              background: '#e5e7eb',
-              borderRadius: 3,
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                height: '100%',
-                width: `${percentage}%`,
-                background: isOverBudget ? '#ef4444' : '#10b981',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-          </li>
-        )
-        })}
-      </ul>
+            </li>
+          )
+          })}
+        </ul>
 
-      {items.length === 0 && (
-        <div className="card" style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>
-          📊 No budgets yet. Create one above!
-        </div>
-      )}
-      
-      <div className="card" style={{marginTop: 12, fontSize: '0.875rem', color: '#6b7280'}}>
-        <strong>Note:</strong> Budget tracking uses transactions assigned to each budget.
-        Spending is calculated from current month's transactions with negative amounts.
+        {items.length === 0 && (
+          <div style={{padding: 20, textAlign: 'center', color: '#6b7280'}}>
+            <div style={{fontSize: '2rem', marginBottom: 8}}>📊</div>
+            No budgets yet. Create one above!
+          </div>
+        )}
+
+        {items.length > 0 && (
+          <div style={{
+            padding: 12,
+            marginTop: 12,
+            borderTop: '1px solid var(--border)',
+            background: 'var(--accent-light)',
+            borderRadius: 6
+          }}>
+            <div style={{fontSize: '0.875rem', color: 'var(--text)'}}>
+              <strong>Total Budget:</strong>{' '}
+              <span style={{fontSize: '1rem', fontWeight: 600}}>
+                {formatCurrency(items.reduce((sum, b) => sum + b.amount, 0), currency)}
+              </span>
+            </div>
+            <div style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4}}>
+              Allocated across {items.length} {items.length === 1 ? 'budget' : 'budgets'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card" style={{marginTop: 12, fontSize: '0.875rem', color: 'var(--text-secondary)'}}>
+        <strong>ℹ️ How Budget Tracking Works:</strong>
+        <ul style={{margin: '8px 0', paddingLeft: 20}}>
+          <li>Spending is calculated from current month's transactions assigned to each budget</li>
+          <li>Only expenses (negative amounts) are counted toward budget usage</li>
+          <li>Red progress bar indicates when you've exceeded the budget</li>
+        </ul>
       </div>
         </>
       )}

@@ -30,8 +30,9 @@ export default function SettingsPage() {
       db.getMeta<string>('defaultAccountId'),
       db.getMeta<string>('defaultBudgetId'),
       db.getMeta<string>('githubToken'),
-      db.getMeta<number>('monthCycleDay')
-    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay]) => {
+      db.getMeta<number>('monthCycleDay'),
+      db.getMeta<string>('gistUrl')
+    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay, savedGistUrl]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
@@ -43,6 +44,7 @@ export default function SettingsPage() {
         setDefaultBudgetId(defBudId || '')
         setGithubToken(ghToken || '')
         setMonthCycleDay(cycleDay || 1)
+        setGistUrl(savedGistUrl || '')
         setLoading(false)
       }
     })
@@ -159,6 +161,53 @@ export default function SettingsPage() {
     alert('GitHub token saved!')
   }
 
+  async function clearGistUrl(){
+    if (!confirm('Clear the saved Gist URL? Your next export will create a new Gist.')) {
+      return
+    }
+    await db.setMeta('gistUrl', '')
+    setGistUrl('')
+    alert('Saved Gist URL cleared!')
+  }
+
+  async function saveGistUrl(){
+    if (!gistUrl.trim()) {
+      alert('Please enter a valid Gist URL or ID')
+      return
+    }
+
+    // Validate URL format
+    let gistId = gistUrl.trim()
+    if (gistUrl.includes('gist.github.com/')) {
+      const parts = gistUrl.split('/')
+      gistId = parts[parts.length - 1]
+    }
+
+    // Basic validation - should be a 32-character hex string (GitHub gist ID format)
+    if (!/^[a-f0-9]{32}$/.test(gistId) && !gistUrl.includes('gist.github.com/')) {
+      alert('Invalid Gist URL or ID format')
+      return
+    }
+
+    try {
+      // Verify the gist exists by fetching it
+      const response = await fetch(`https://api.github.com/gists/${gistId}`)
+      if (!response.ok) {
+        throw new Error('Gist not found')
+      }
+
+      const gist = await response.json()
+      const gistUrl = gist.html_url
+
+      // Save to database
+      await db.setMeta('gistUrl', gistUrl)
+      setGistUrl(gistUrl)
+      alert('✅ Gist URL saved successfully!')
+    } catch (e: any) {
+      alert('Error saving Gist URL: ' + e.message)
+    }
+  }
+
   async function exportToPastebin(){
     if (!githubToken) {
       alert('Please enter and save your GitHub token first!')
@@ -177,8 +226,22 @@ export default function SettingsPage() {
       
       const dataStr = JSON.stringify(exportData)
       
-      const response = await fetch('https://api.github.com/gists', {
-        method: 'POST',
+      // Extract gist ID from saved URL if available
+      let gistId = null
+      if (gistUrl) {
+        if (gistUrl.includes('gist.github.com/')) {
+          const parts = gistUrl.split('/')
+          gistId = parts[parts.length - 1]
+        } else {
+          gistId = gistUrl
+        }
+      }
+
+      const method = gistId ? 'PATCH' : 'POST'
+      const endpoint = gistId ? `https://api.github.com/gists/${gistId}` : 'https://api.github.com/gists'
+      
+      const response = await fetch(endpoint, {
+        method: method,
         headers: {
           'Authorization': `token ${githubToken}`,
           'Content-Type': 'application/json'
@@ -196,13 +259,18 @@ export default function SettingsPage() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.message || 'Failed to create gist')
+        throw new Error(error.message || 'Failed to export gist')
       }
 
       const result = await response.json()
+      const newGistUrl = result.html_url
       
-      alert(`✅ Data exported to GitHub Gist!\n\nURL: ${result.html_url}\n\nSave this URL to import your data later.`)
-      setGistUrl(result.html_url)
+      // Save the gist URL to database
+      await db.setMeta('gistUrl', newGistUrl)
+      setGistUrl(newGistUrl)
+      
+      const action = gistId ? 'updated' : 'created'
+      alert(`✅ Data ${action} on GitHub Gist!\n\nURL: ${newGistUrl}`)
     } catch (e: any) {
       alert('Export error: ' + e.message)
     } finally {
@@ -448,26 +516,87 @@ export default function SettingsPage() {
         </div>
 
         <div style={{marginBottom: 20, paddingTop: 20, borderTop: '1px solid var(--border)'}}>
-          <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '1rem'}}>Export to GitHub Gist</h4>
-          <button 
-            onClick={exportToPastebin} 
-            disabled={exporting || !githubToken}
-            style={{
-              background: exporting ? '#9ca3af' : '#10b981',
-              cursor: exporting || !githubToken ? 'not-allowed' : 'pointer',
-              opacity: exporting || !githubToken ? 0.6 : 1
-            }}
-          >
-            {exporting ? '⏳ Exporting...' : '📤 Export to GitHub Gist'}
-          </button>
+          <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '1rem'}}>Save Gist URL</h4>
+          <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 12}}>
+            Save a GitHub Gist URL to use for future exports and imports. This allows you to restore from a previous backup or share across devices.
+          </p>
+          <div style={{marginBottom: 12}}>
+            <label style={{marginBottom: 8}}>Gist URL or ID</label>
+            <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+              <input 
+                type="text"
+                value={gistUrl} 
+                onChange={(e) => setGistUrl(e.target.value)}
+                placeholder="https://gist.github.com/username/abcd1234... or ID"
+                style={{flex: 1}}
+              />
+              <button 
+                onClick={saveGistUrl}
+                style={{
+                  padding: '8px 16px',
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  fontWeight: 500,
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                💾 Save URL
+              </button>
+            </div>
+          </div>
           {gistUrl && (
-            <div style={{marginTop: 12, padding: 12, background: '#d1fae5', border: '1px solid #10b981', borderRadius: 8, fontSize: '0.875rem'}}>
-              <strong>✅ Last export URL:</strong>
-              <div style={{marginTop: 8, wordBreak: 'break-all'}}>
+            <div style={{padding: 12, background: '#d1fae5', border: '1px solid #10b981', borderRadius: 8, fontSize: '0.875rem'}}>
+              <strong>✅ Saved URL:</strong>
+              <p style={{marginTop: 8, marginBottom: 8, wordBreak: 'break-all'}}>
                 <a href={gistUrl} target="_blank" rel="noopener noreferrer" style={{color: '#059669'}}>
                   {gistUrl}
                 </a>
-              </div>
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div style={{marginBottom: 20, paddingTop: 20, borderTop: '1px solid var(--border)'}}>
+          <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '1rem'}}>Export to GitHub Gist</h4>
+          <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 12}}>
+            {gistUrl ? 'Click to update the saved Gist with your latest data.' : 'Click to create a new Gist with your data.'}
+          </p>
+          <div style={{marginBottom: 12}}>
+            <button 
+              onClick={exportToPastebin} 
+              disabled={exporting || !githubToken}
+              style={{
+                background: exporting ? '#9ca3af' : '#10b981',
+                cursor: exporting || !githubToken ? 'not-allowed' : 'pointer',
+                opacity: exporting || !githubToken ? 0.6 : 1
+              }}
+            >
+              {exporting ? '⏳ Exporting...' : gistUrl ? '📤 Update GitHub Gist' : '📤 Export to GitHub Gist'}
+            </button>
+          </div>
+          {gistUrl && (
+            <div style={{marginTop: 12, padding: 12, background: '#d1fae5', border: '1px solid #10b981', borderRadius: 8, fontSize: '0.875rem'}}>
+              <small style={{color: '#047857', display: 'block', marginBottom: 8}}>
+                📌 Using saved Gist: Exports will update this Gist automatically
+              </small>
+              <button 
+                onClick={clearGistUrl}
+                style={{
+                  padding: '4px 12px',
+                  fontSize: '0.75rem',
+                  background: '#f3f4f6',
+                  border: '1px solid #d1d5db',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                  color: '#374151'
+                }}
+              >
+                🔄 Use Different Gist
+              </button>
             </div>
           )}
         </div>

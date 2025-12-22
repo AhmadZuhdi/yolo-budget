@@ -84,21 +84,21 @@ export default function Nav(){
     return (
       <>
         <nav className="bottom-nav">
-          <NavLink to="/" className={({isActive})=>isActive? 'active':''} onClick={() => setShowMoreMenu(false)}>
-            <span className="icon">📊</span>
-            <span className="label">Home</span>
-          </NavLink>
           <NavLink to="/transactions" className={({isActive})=>isActive? 'active':''} onClick={() => setShowMoreMenu(false)}>
             <span className="icon">💸</span>
             <span className="label">Transactions</span>
+          </NavLink>
+          <NavLink to="/reports" className={({isActive})=>isActive? 'active':''} onClick={() => setShowMoreMenu(false)}>
+            <span className="icon">📈</span>
+            <span className="label">Reports</span>
           </NavLink>
           <NavLink to="/accounts" className={({isActive})=>isActive? 'active':''} onClick={() => setShowMoreMenu(false)}>
             <span className="icon">🏛️</span>
             <span className="label">Accounts</span>
           </NavLink>
-          <NavLink to="/reports" className={({isActive})=>isActive? 'active':''} onClick={() => setShowMoreMenu(false)}>
-            <span className="icon">📈</span>
-            <span className="label">Reports</span>
+          <NavLink to="/budgets" className={({isActive})=>isActive? 'active':''} onClick={() => setShowMoreMenu(false)}>
+            <span className="icon">💰</span>
+            <span className="label">Budgets</span>
           </NavLink>
           <div style={{position:'relative',display:'flex'}}>
             <button 
@@ -143,26 +143,6 @@ export default function Nav(){
                   zIndex:999,
                   overflow:'hidden'
                 }}>
-                <NavLink 
-                  to="/budgets" 
-                  onClick={() => setShowMoreMenu(false)}
-                  style={{
-                    display:'flex',
-                    alignItems:'center',
-                    gap:12,
-                    padding:'12px 16px',
-                    textDecoration:'none',
-                    color:'var(--text)',
-                    background:'var(--bg-secondary)',
-                    borderBottom:'1px solid var(--border)',
-                    transition:'background 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
-                >
-                  <span style={{fontSize:'1.25rem'}}>💰</span>
-                  <span style={{fontWeight:500}}>Budgets</span>
-                </NavLink>
                 <NavLink 
                   to="/recurring" 
                   onClick={() => setShowMoreMenu(false)}
@@ -236,14 +216,11 @@ export default function Nav(){
           <button className="close-btn" onClick={closeMenu} aria-label="Close menu">✕</button>
         </div>
         <div className="side-nav-links">
-          <NavLink to="/" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
-            <span className="icon">📊</span> Dashboard
-          </NavLink>
           <NavLink to="/transactions" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
             <span className="icon">💸</span> Transactions
           </NavLink>
-          <NavLink to="/recurring" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
-            <span className="icon">🔁</span> Recurring
+          <NavLink to="/reports" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
+            <span className="icon">📈</span> Reports
           </NavLink>
           <NavLink to="/accounts" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
             <span className="icon">🏛️</span> Accounts
@@ -251,8 +228,8 @@ export default function Nav(){
           <NavLink to="/budgets" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
             <span className="icon">💰</span> Budgets
           </NavLink>
-          <NavLink to="/reports" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
-            <span className="icon">📈</span> Reports
+          <NavLink to="/recurring" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
+            <span className="icon">🔁</span> Recurring
           </NavLink>
           <NavLink to="/settings" onClick={closeMenu} className={({isActive})=>isActive? 'active':''}>
             <span className="icon">⚙️</span> Settings

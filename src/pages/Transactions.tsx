@@ -62,13 +62,30 @@ export default function TransactionsPage() {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 640)
   
   // Transfer state
   const [transferFrom, setTransferFrom] = useState('')
   const [transferTo, setTransferTo] = useState('')
   const [transferAmount, setTransferAmount] = useState('')
   const [transferDesc, setTransferDesc] = useState('')
+  const [transferFee, setTransferFee] = useState('')
+  const [transferFeeAccount, setTransferFeeAccount] = useState('')
 
+
+  useEffect(() => {
+    let mounted = true
+    const handleResize = () => {
+      if (mounted) {
+        setIsMobile(window.innerWidth < 640)
+      }
+    }
+    window.addEventListener('resize', handleResize)
+    return () => {
+      mounted = false
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
 
   useEffect(() => {
     let mounted = true
@@ -306,24 +323,44 @@ export default function TransactionsPage() {
       alert('Transfer amount must be positive')
       return
     }
-    
-    const tx: Transaction = {
-      id: `tx:${Date.now()}`,
-      date,
-      description: transferDesc || `Transfer from ${getAccountName(transferFrom)} to ${getAccountName(transferTo)}`,
-      lines: [
-        { accountId: transferFrom, amount: -amount },
-        { accountId: transferTo, amount: amount }
-      ]
+
+    const fee = transferFee ? Number(transferFee) : 0
+    if (fee < 0) {
+      alert('Transfer fee cannot be negative')
+      return
+    }
+
+    // If fee is set, must select which account to charge
+    if (fee > 0 && !transferFeeAccount) {
+      alert('Please select which account to charge the fee to')
+      return
     }
     
     try {
+      // Create transfer transaction with possible fee
+      const lines: TransactionLine[] = [
+        { accountId: transferFrom, amount: -amount },
+        { accountId: transferTo, amount: amount }
+      ]
+
+      // Add fee line if fee exists
+      if (fee > 0) {
+        lines.push({ accountId: transferFeeAccount, amount: -fee })
+      }
+
+      const tx: Transaction = {
+        id: `tx:${Date.now()}`,
+        date,
+        description: transferDesc || `Transfer from ${getAccountName(transferFrom)} to ${getAccountName(transferTo)}${fee > 0 ? ` (fee: ${formatCurrency(fee, currency)})` : ''}`,
+        lines: lines
+      }
+      
       if (doubleEntry) {
         await db.addTransaction(tx)
       } else {
         // In simple mode, still create a transfer as a balanced transaction
         await db.add('transactions', tx)
-        // Update both account balances
+        // Update account balances
         const fromAcc = await db.get<Account>('accounts', transferFrom)
         const toAcc = await db.get<Account>('accounts', transferTo)
         if (fromAcc) {
@@ -334,6 +371,13 @@ export default function TransactionsPage() {
           toAcc.balance = (toAcc.balance || 0) + amount
           await db.put('accounts', toAcc)
         }
+        if (fee > 0) {
+          const feeAcc = await db.get<Account>('accounts', transferFeeAccount)
+          if (feeAcc) {
+            feeAcc.balance = (feeAcc.balance || 0) - fee
+            await db.put('accounts', feeAcc)
+          }
+        }
       }
       
       setItems(await db.getAll('transactions'))
@@ -341,7 +385,9 @@ export default function TransactionsPage() {
       setTransferTo('')
       setTransferAmount('')
       setTransferDesc('')
-      alert('✅ Transfer completed successfully!')
+      setTransferFee('')
+      setTransferFeeAccount('')
+      alert(`✅ Transfer completed successfully!${fee > 0 ? ` (Fee: ${formatCurrency(fee, currency)})` : ''}`)
     } catch (e: any) {
       alert('Transfer failed: ' + e.message)
     }
@@ -487,6 +533,26 @@ export default function TransactionsPage() {
           min="0"
           step="0.01"
         />
+
+        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8}}>
+          <input 
+            type="number" 
+            placeholder="Transfer fee (optional)" 
+            value={transferFee} 
+            onChange={(e)=>setTransferFee(e.target.value)}
+            min="0"
+            step="0.01"
+          />
+          <select 
+            value={transferFeeAccount} 
+            onChange={(e)=>setTransferFeeAccount(e.target.value)}
+            disabled={!transferFee || Number(transferFee) === 0}
+            style={{opacity: !transferFee || Number(transferFee) === 0 ? 0.5 : 1}}
+          >
+            <option value="">Charge fee to...</option>
+            {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+          </select>
+        </div>
         
         <input 
           placeholder="Description (optional)" 
@@ -494,9 +560,18 @@ export default function TransactionsPage() {
           onChange={(e)=>setTransferDesc(e.target.value)}
           style={{marginBottom: 8}}
         />
+
+        <div style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, padding: '8px', background: 'var(--bg)', borderRadius: 4}}>
+          <strong>Fee Info:</strong> If a fee is set, it will create a transaction with 3 lines:
+          <ul style={{margin: '4px 0', paddingLeft: 16}}>
+            <li>From account: -{formatCurrency(Number(transferAmount) || 0, currency)}</li>
+            <li>To account: +{formatCurrency(Number(transferAmount) || 0, currency)}</li>
+            {transferFee && Number(transferFee) > 0 && <li>Fee account: -{formatCurrency(Number(transferFee), currency)}</li>}
+          </ul>
+        </div>
         
         <button onClick={quickTransfer} className="button-success" style={{width: '100%'}}>
-          🔄 Transfer {transferAmount && `${formatCurrency(Number(transferAmount), currency)}`}
+          🔄 Transfer {transferAmount && `${formatCurrency(Number(transferAmount), currency)}`}{transferFee && Number(transferFee) > 0 && ` + ${formatCurrency(Number(transferFee), currency)} fee`}
         </button>
           </>
         )}
@@ -590,7 +665,7 @@ export default function TransactionsPage() {
             </select>
           </div>
 
-          <div style={{display:'flex', alignItems:'center', gap:8}}>
+          <div style={{display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', justifyContent:'center'}}>
             <button
               onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
               disabled={currentPage === 1}
@@ -604,34 +679,64 @@ export default function TransactionsPage() {
                 opacity: currentPage === 1 ? 0.5 : 1,
                 fontSize:'0.875rem',
                 fontWeight:500,
-                transition:'all 0.2s'
+                transition:'all 0.2s',
+                whiteSpace:'nowrap'
               }}
             >
               ← Previous
             </button>
             
-            <div style={{display:'flex', gap:4, alignItems:'center'}}>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  style={{
-                    padding:'6px 10px',
-                    border: currentPage === page ? '2px solid var(--accent)' : '1px solid var(--border)',
-                    borderRadius:4,
-                    background: currentPage === page ? 'var(--accent)' : 'var(--bg)',
-                    color: currentPage === page ? 'white' : 'var(--text)',
-                    cursor:'pointer',
-                    fontSize:'0.875rem',
-                    fontWeight: currentPage === page ? 600 : 400,
-                    transition:'all 0.2s',
-                    minWidth:'40px'
-                  }}
-                >
-                  {page}
-                </button>
-              ))}
-            </div>
+            {!isMobile && totalPages > 5 ? (
+              <div style={{display:'flex', gap:4, alignItems:'center', justifyContent:'center'}}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    style={{
+                      padding:'6px 10px',
+                      border: currentPage === page ? '2px solid var(--accent)' : '1px solid var(--border)',
+                      borderRadius:4,
+                      background: currentPage === page ? 'var(--accent)' : 'var(--bg)',
+                      color: currentPage === page ? 'white' : 'var(--text)',
+                      cursor:'pointer',
+                      fontSize:'0.875rem',
+                      fontWeight: currentPage === page ? 600 : 400,
+                      transition:'all 0.2s',
+                      minWidth:'40px'
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+            ) : totalPages <= 5 ? (
+              <div style={{display:'flex', gap:4, alignItems:'center', justifyContent:'center'}}>
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    style={{
+                      padding:'6px 10px',
+                      border: currentPage === page ? '2px solid var(--accent)' : '1px solid var(--border)',
+                      borderRadius:4,
+                      background: currentPage === page ? 'var(--accent)' : 'var(--bg)',
+                      color: currentPage === page ? 'white' : 'var(--text)',
+                      cursor:'pointer',
+                      fontSize:'0.875rem',
+                      fontWeight: currentPage === page ? 600 : 400,
+                      transition:'all 0.2s',
+                      minWidth:'40px'
+                    }}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span style={{fontSize:'0.875rem', color:'var(--text)', fontWeight:500, minWidth:'fit-content'}}>
+                Page {currentPage} of {totalPages}
+              </span>
+            )}
 
             <button
               onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
@@ -646,7 +751,8 @@ export default function TransactionsPage() {
                 opacity: currentPage === totalPages ? 0.5 : 1,
                 fontSize:'0.875rem',
                 fontWeight:500,
-                transition:'all 0.2s'
+                transition:'all 0.2s',
+                whiteSpace:'nowrap'
               }}
             >
               Next →
