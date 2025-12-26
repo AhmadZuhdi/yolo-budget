@@ -13,6 +13,7 @@ export default function BudgetsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [categoryFilter, setCategoryFilter] = useState('')
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [monthCycleDay, setMonthCycleDay] = useState(1)
 
   useEffect(() => {
     let mounted = true
@@ -20,13 +21,15 @@ export default function BudgetsPage() {
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('currency'),
       db.getAll<Transaction>('transactions'),
-      db.getAll<Account>('accounts')
-    ]).then(([budgets, curr, txs, accs]) => {
+      db.getAll<Account>('accounts'),
+      db.getMeta<number>('monthCycleDay')
+    ]).then(([budgets, curr, txs, accs, cycleDay]) => {
       if (mounted) {
         setItems(budgets)
         setCurrency(curr || 'USD')
         setTransactions(txs)
         setAccounts(accs)
+        setMonthCycleDay(cycleDay || 1)
         setLoading(false)
       }
     })
@@ -35,16 +38,30 @@ export default function BudgetsPage() {
 
   // Calculate spending for a budget by summing transactions assigned to it
   const getSpending = (budgetId: string) => {
-    // Get current month transactions
     const now = new Date()
-    const currentMonth = now.toISOString().slice(0, 7) // YYYY-MM
+    let startDate: Date
+    let endDate: Date
     
-    const monthTransactions = transactions.filter(t => 
-      t.date.startsWith(currentMonth) && t.budgetId === budgetId
+    // Calculate the month cycle based on monthCycleDay
+    if (now.getDate() >= monthCycleDay) {
+      // We're in the current cycle
+      startDate = new Date(now.getFullYear(), now.getMonth(), monthCycleDay)
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, monthCycleDay)
+    } else {
+      // We're in the previous cycle
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, monthCycleDay)
+      endDate = new Date(now.getFullYear(), now.getMonth(), monthCycleDay)
+    }
+    
+    const startDateStr = startDate.toISOString().slice(0, 10)
+    const endDateStr = endDate.toISOString().slice(0, 10)
+    
+    const cycleTransactions = transactions.filter(t => 
+      t.date >= startDateStr && t.date < endDateStr && t.budgetId === budgetId
     )
     
     let totalSpending = 0
-    for (const tx of monthTransactions) {
+    for (const tx of cycleTransactions) {
       for (const line of tx.lines) {
         // Count absolute amounts as spending (regardless of sign)
         // In double-entry, expenses are negative; in simple mode, expenses are also negative

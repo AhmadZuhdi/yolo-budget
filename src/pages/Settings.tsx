@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
   const [monthCycleDay, setMonthCycleDay] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
 
   useEffect(()=>{
     let mounted = true
@@ -31,8 +32,9 @@ export default function SettingsPage() {
       db.getMeta<string>('defaultBudgetId'),
       db.getMeta<string>('githubToken'),
       db.getMeta<number>('monthCycleDay'),
-      db.getMeta<string>('gistUrl')
-    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay, savedGistUrl]) => {
+      db.getMeta<string>('gistUrl'),
+      db.getMeta<number>('itemsPerPage')
+    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay, savedGistUrl, savedItemsPerPage]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
         setDoubleEntry(de !== false) // default to true
@@ -45,6 +47,7 @@ export default function SettingsPage() {
         setGithubToken(ghToken || '')
         setMonthCycleDay(cycleDay || 1)
         setGistUrl(savedGistUrl || '')
+        setItemsPerPage(savedItemsPerPage || 10)
         setLoading(false)
       }
     })
@@ -88,6 +91,11 @@ export default function SettingsPage() {
   async function saveMonthCycleDay(){
     await db.setMeta('monthCycleDay', monthCycleDay)
     alert('Month cycle day saved!')
+  }
+
+  async function savePaginationSettings(){
+    await db.setMeta('itemsPerPage', itemsPerPage)
+    alert('Pagination settings saved!')
   }
 
   async function doExport(){
@@ -372,6 +380,34 @@ export default function SettingsPage() {
         </div>
         <small style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 8, display: 'block'}}>
           Example: Day 25 means from last month 25th to this month 25th
+        </small>
+      </div>
+
+      <div className="card" style={{marginBottom: 20}}>
+        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
+          <span style={{fontSize: '1.5rem'}}>📄</span> Pagination Settings
+        </h3>
+        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
+          Configure how many items per page to show in the Transactions list.
+        </p>
+        <label style={{marginBottom: 8}}>Items per page</label>
+        <div style={{display: 'flex', gap: 12, alignItems: 'center'}}>
+          <select 
+            value={itemsPerPage} 
+            onChange={(e) => setItemsPerPage(parseInt(e.target.value))}
+            style={{flex: 1}}
+          >
+            <option value="5">5 items</option>
+            <option value="10">10 items</option>
+            <option value="15">15 items</option>
+            <option value="20">20 items</option>
+            <option value="25">25 items</option>
+            <option value="50">50 items</option>
+          </select>
+          <button onClick={savePaginationSettings} style={{whiteSpace: 'nowrap'}}>Save Pagination</button>
+        </div>
+        <small style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 8, display: 'block'}}>
+          The current page and items per page will be automatically remembered when you navigate away.
         </small>
       </div>
 

@@ -34,6 +34,8 @@ export type RecurringTransaction = {
   startDate: string
   endDate?: string
   lastProcessed?: string
+  budgetId?: string
+  tags?: string[]
   lines: TransactionLine[]
   active: boolean
 }
@@ -182,45 +184,135 @@ export const db = {
   },
 
   // Recurring transactions processing
+
+  async processRecurringTransaction(id: string) {
+    // Process a single recurring transaction (force process)
+    const r = await this.get<RecurringTransaction>('recurringTransactions', id)
+    if (!r) throw new Error('Recurring transaction not found')
+    
+    const today = new Date().toISOString().slice(0, 10)
+    const doubleEntry = await this.getMeta<boolean>('doubleEntry')
+    const isDoubleEntry = doubleEntry !== false
+    
+    console.log(`[ProcessSingle] Processing "${r.description}" on ${today}`)
+    
+    try {
+      // Create transaction from recurring template
+      const tx: Transaction = {
+        id: `tx:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+        date: today,
+        description: r.description + ' (recurring)',
+        budgetId: r.budgetId,
+        tags: r.tags,
+        lines: r.lines
+      }
+      
+      console.log(`[ProcessSingle] Creating transaction:`, tx)
+      
+      if (isDoubleEntry) {
+        // Validate balanced transaction for double-entry mode
+        const sum = tx.lines.reduce((s, l) => s + l.amount, 0)
+        console.log(`[ProcessSingle] Double-entry mode, balance sum: ${sum}`)
+        if (Math.abs(sum) > 1e-6) {
+          throw new Error(`Not balanced! sum: ${sum}`)
+        }
+        await this.addTransaction(tx)
+      } else {
+        // Simple mode: add transaction and update account balance
+        console.log(`[ProcessSingle] Simple mode, saving transaction`)
+        await this.add('transactions', tx)
+        if (tx.lines[0]) {
+          const acc = await this.get<Account>('accounts', tx.lines[0].accountId)
+          if (acc) {
+            console.log(`[ProcessSingle] Updating balance for account ${tx.lines[0].accountId}: ${acc.balance} + ${tx.lines[0].amount}`)
+            acc.balance = (acc.balance || 0) + tx.lines[0].amount
+            await this.put('accounts', acc)
+          }
+        }
+      }
+      
+      // Update last processed date
+      r.lastProcessed = today
+      await this.put('recurringTransactions', r)
+      console.log(`[ProcessSingle] ✅ Processed successfully`)
+    } catch (err) {
+      console.error(`[ProcessSingle] ❌ Error:`, err)
+      throw err
+    }
+  },
+
   async processRecurringTransactions() {
     const recurring = await this.getAll<RecurringTransaction>('recurringTransactions')
     const today = new Date().toISOString().slice(0, 10)
     const doubleEntry = await this.getMeta<boolean>('doubleEntry')
     const isDoubleEntry = doubleEntry !== false
     
+    console.log(`[Process] Found ${recurring.length} recurring transactions, mode: ${isDoubleEntry ? 'double-entry' : 'simple'}, today: ${today}`)
+    
+    let processed = 0
     for (const r of recurring) {
-      if (!r.active) continue
-      if (r.endDate && r.endDate < today) continue
+      console.log(`[Process] Checking "${r.description}" - active: ${r.active}, endDate: ${r.endDate}, lines: ${r.lines.length}`)
+      if (!r.active) {
+        console.log(`[Process]   → Skipped (inactive)`)
+        continue
+      }
+      if (r.endDate && r.endDate < today) {
+        console.log(`[Process]   → Skipped (ended on ${r.endDate})`)
+        continue
+      }
       
       const lastProcessed = r.lastProcessed || r.startDate
-      if (this.shouldProcess(lastProcessed, today, r.frequency)) {
-        // Create transaction from recurring template
-        const tx: Transaction = {
-          id: `tx:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
-          date: today,
-          description: r.description + ' (recurring)',
-          lines: r.lines
-        }
-        
-        if (isDoubleEntry) {
-          await this.addTransaction(tx)
-        } else {
-          // Simple mode: add transaction and update account balance
-          await this.add('transactions', tx)
-          if (tx.lines[0]) {
-            const acc = await this.get<Account>('accounts', tx.lines[0].accountId)
-            if (acc) {
-              acc.balance = (acc.balance || 0) + tx.lines[0].amount
-              await this.put('accounts', acc)
+      const shouldProc = this.shouldProcess(lastProcessed, today, r.frequency)
+      console.log(`[Process]   → Should process: ${shouldProc} (last: ${lastProcessed}, freq: ${r.frequency})`)
+      
+      if (shouldProc) {
+        try {
+          // Create transaction from recurring template
+          const tx: Transaction = {
+            id: `tx:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,
+            date: today,
+            description: r.description + ' (recurring)',
+            budgetId: r.budgetId,
+            tags: r.tags,
+            lines: r.lines
+          }
+          
+          console.log(`[Process]   → Creating transaction:`, tx)
+          
+          if (isDoubleEntry) {
+            // Validate balanced transaction for double-entry mode
+            const sum = tx.lines.reduce((s, l) => s + l.amount, 0)
+            console.log(`[Process]   → Double-entry mode, balance sum: ${sum}`)
+            if (Math.abs(sum) > 1e-6) {
+              console.error(`[Process]   → ❌ Not balanced! sum: ${sum}`)
+              continue
+            }
+            await this.addTransaction(tx)
+          } else {
+            // Simple mode: add transaction and update account balance
+            console.log(`[Process]   → Simple mode, saving transaction`)
+            await this.add('transactions', tx)
+            if (tx.lines[0]) {
+              const acc = await this.get<Account>('accounts', tx.lines[0].accountId)
+              if (acc) {
+                console.log(`[Process]   → Updating balance for account ${tx.lines[0].accountId}: ${acc.balance} + ${tx.lines[0].amount}`)
+                acc.balance = (acc.balance || 0) + tx.lines[0].amount
+                await this.put('accounts', acc)
+              }
             }
           }
+          
+          // Update last processed date
+          r.lastProcessed = today
+          await this.put('recurringTransactions', r)
+          console.log(`[Process]   → ✅ Processed successfully`)
+          processed++
+        } catch (err) {
+          console.error(`[Process]   → ❌ Error:`, err)
         }
-        
-        // Update last processed date
-        r.lastProcessed = today
-        await this.put('recurringTransactions', r)
       }
     }
+    console.log(`[Process] Done. Processed ${processed}/${recurring.length}`)
   },
 
   shouldProcess(lastProcessed: string, today: string, frequency: RecurringTransaction['frequency']): boolean {

@@ -96,8 +96,10 @@ export default function TransactionsPage() {
       db.getAll<Budget>('budgets'),
       db.getMeta<boolean>('doubleEntry'),
       db.getMeta<string>('defaultAccountId'),
-      db.getMeta<string>('defaultBudgetId')
-    ]).then(([transactions, accs, curr, buds, de, defAccId, defBudId]) => {
+      db.getMeta<string>('defaultBudgetId'),
+      db.getMeta<number>('itemsPerPage'),
+      db.getMeta<number>('paginationPage')
+    ]).then(([transactions, accs, curr, buds, de, defAccId, defBudId, savedItemsPerPage, savedPage]) => {
       if (mounted) {
         setItems(transactions)
         setAccounts(accs)
@@ -110,6 +112,13 @@ export default function TransactionsPage() {
         }
         if (!editingId && defBudId) {
           setBudgetId(defBudId)
+        }
+        // Load pagination settings
+        if (savedItemsPerPage) {
+          setItemsPerPage(savedItemsPerPage)
+        }
+        if (savedPage) {
+          setCurrentPage(savedPage)
         }
         setLoading(false)
       }
@@ -153,6 +162,15 @@ export default function TransactionsPage() {
       setPrevFilterLength(filteredItems.length)
     }
   }, [filteredItems.length, prevFilterLength])
+
+  // Save pagination settings when they change
+  useEffect(() => {
+    db.setMeta('itemsPerPage', itemsPerPage)
+  }, [itemsPerPage])
+
+  useEffect(() => {
+    db.setMeta('paginationPage', currentPage)
+  }, [currentPage])
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage)

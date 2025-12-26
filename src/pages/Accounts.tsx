@@ -76,6 +76,41 @@ export default function AccountsPage() {
     setReconcileAmount(String(acc.balance ?? 0))
   }
 
+  async function recalculateBalance(accountId: string) {
+    try {
+      const allTransactions = await db.getAll('transactions')
+      let calculatedBalance = 0
+      
+      // Sum all transaction amounts for this account
+      for (const tx of allTransactions) {
+        for (const line of tx.lines) {
+          if (line.accountId === accountId) {
+            calculatedBalance += line.amount
+          }
+        }
+      }
+
+      // Update the account with the recalculated balance
+      const acc = await db.get<Account>('accounts', accountId)
+      if (acc) {
+        const oldBalance = acc.balance ?? 0
+        acc.balance = calculatedBalance
+        await db.put('accounts', acc)
+        setItems(await db.getAll('accounts'))
+        
+        const difference = calculatedBalance - oldBalance
+        if (Math.abs(difference) < 0.01) {
+          alert(`✓ Balance already correct: ${formatCurrency(calculatedBalance, currency)}`)
+        } else {
+          alert(`✓ Balance recalculated!\nOld: ${formatCurrency(oldBalance, currency)}\nNew: ${formatCurrency(calculatedBalance, currency)}\nDifference: ${difference > 0 ? '+' : ''}${formatCurrency(difference, currency)}`)
+        }
+      }
+    } catch (err) {
+      console.error('Error recalculating balance:', err)
+      alert('Error recalculating balance')
+    }
+  }
+
   async function performReconcile() {
     if (!reconcilingAccount) return
     const finalAmount = parseFloat(reconcileAmount)
@@ -88,7 +123,7 @@ export default function AccountsPage() {
     const difference = finalAmount - currentBalance
     
     if (Math.abs(difference) < 0.01) {
-      alert('No reconciliation needed - balances match!')
+      alert('✓ Balances match perfectly! No reconciliation needed.')
       setReconcilingAccount(null)
       return
     }
@@ -109,13 +144,14 @@ export default function AccountsPage() {
     // Update account balance
     const acc = await db.get<Account>('accounts', reconcilingAccount.id)
     if (acc) {
-      acc.balance = (acc.balance || 0) + difference
+      acc.balance = finalAmount
       await db.put('accounts', acc)
     }
     
     setItems(await db.getAll('accounts'))
     setReconcilingAccount(null)
     setReconcileAmount('')
+    alert(`✓ Reconciled! ${difference > 0 ? 'Added' : 'Subtracted'} ${formatCurrency(Math.abs(difference), currency)}`)
   }
 
   return (
@@ -239,6 +275,27 @@ export default function AccountsPage() {
                           <span>✏️</span> Edit
                         </button>
                         <button 
+                          onClick={() => {recalculateBalance(a.id); setOpenMenuId(null)}}
+                          style={{
+                            width:'100%',
+                            padding:'10px 16px',
+                            textAlign:'left',
+                            background:'var(--bg-secondary)',
+                            border:'none',
+                            cursor:'pointer',
+                            fontSize:'0.875rem',
+                            color:'var(--text)',
+                            display:'flex',
+                            alignItems:'center',
+                            gap:8,
+                            borderTop:'1px solid var(--border)'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                        >
+                          <span>🔄</span> Recalculate
+                        </button>
+                        <button 
                           onClick={() => {startReconcile(a); setOpenMenuId(null)}}
                           style={{
                             width:'100%',
@@ -324,75 +381,68 @@ export default function AccountsPage() {
               boxShadow:'0 8px 16px rgba(0,0,0,0.2)',
               zIndex:1001,
               width:'90%',
-              maxWidth:400
+              maxWidth:420
             }}
           >
-            <h3 style={{marginTop:0, marginBottom:16}}>⚖️ Reconcile Account</h3>
-            <div style={{marginBottom:16,padding:12,background:'var(--accent-light)',borderRadius:6}}>
-              <div style={{fontSize:'0.875rem',color:'#6b7280',marginBottom:4}}>Account</div>
-              <div style={{fontWeight:600}}>{reconcilingAccount.name}</div>
-              <div style={{fontSize:'0.875rem',color:'#6b7280',marginTop:8}}>Current Balance</div>
-              <div style={{fontSize:'1.25rem',fontWeight:700,color:'var(--text)'}}>
+            <h3 style={{marginTop:0, marginBottom:16, fontSize:'1.25rem', fontWeight: 600}}>⚖️ Reconcile Account</h3>
+            
+            <div style={{marginBottom:16, padding:12, background:'var(--accent-light)', borderRadius:6, border:'1px solid var(--accent)'}}>
+              <div style={{fontSize:'0.75rem', fontWeight: 600, color:'#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom:4}}>Account</div>
+              <div style={{fontWeight:600, fontSize: '1rem', marginBottom: 12}}>{reconcilingAccount.name}</div>
+              
+              <div style={{fontSize:'0.75rem', fontWeight: 600, color:'#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom:4}}>Current Balance (from transactions)</div>
+              <div style={{fontSize:'1.25rem', fontWeight:700, color:'var(--text)'}}>
                 {formatCurrency(reconcilingAccount.balance ?? 0, currency)}
               </div>
             </div>
+
             <div style={{marginBottom:16}}>
-              <label>Final Balance</label>
+              <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 8}}>
+                Expected Balance (from statement/bank)
+              </label>
               <input 
                 type="number" 
                 step="0.01"
                 value={reconcileAmount} 
                 onChange={(e) => setReconcileAmount(e.target.value)}
-                placeholder="Enter final balance"
+                placeholder="Enter the balance you see in your statement"
                 autoFocus
+                style={{width: '100%'}}
               />
             </div>
+
             {reconcileAmount && !isNaN(parseFloat(reconcileAmount)) && (
               <div style={{
                 marginBottom:16,
                 padding:12,
                 background:parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '#d1fae5' : '#fee2e2',
+                border: parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '1px solid #a7f3d0' : '1px solid #fecaca',
                 borderRadius:6
               }}>
-                <div style={{fontSize:'0.875rem',fontWeight:600,marginBottom:4}}>
-                  Difference
+                <div style={{fontSize:'0.75rem', fontWeight:600, color:'#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom:4}}>
+                  Discrepancy
                 </div>
-                <div style={{fontSize:'1.125rem',fontWeight:700,color:parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '#059669' : '#dc2626'}}>
-                  {formatCurrency(parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0), currency)}
+                <div style={{fontSize:'1.25rem', fontWeight:700, color:parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '#059669' : '#dc2626'}}>
+                  {parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0) >= 0 ? '+' : ''}{formatCurrency(parseFloat(reconcileAmount) - (reconcilingAccount.balance ?? 0), currency)}
                 </div>
-                <div style={{fontSize:'0.75rem',marginTop:4,color:'#6b7280'}}>
-                  A reconciliation transaction will be created
+                <div style={{fontSize:'0.75rem', marginTop:8, color:'#6b7280', lineHeight: '1.5'}}>
+                  A reconciliation transaction will be created to adjust your balance by this amount.
                 </div>
               </div>
             )}
-            <div style={{display:'flex',gap:8}}>
+
+            <div style={{display:'flex', gap:8}}>
               <button 
                 onClick={performReconcile}
-                style={{
-                  flex:1,
-                  padding:'12px',
-                  background:'#10b981',
-                  color:'white',
-                  border:'none',
-                  borderRadius:6,
-                  cursor:'pointer',
-                  fontWeight:600
-                }}
+                className="button-success"
+                style={{flex:1}}
               >
                 ✓ Reconcile
               </button>
               <button 
                 onClick={() => setReconcilingAccount(null)}
-                style={{
-                  flex:1,
-                  padding:'12px',
-                  background:'#6b7280',
-                  color:'white',
-                  border:'none',
-                  borderRadius:6,
-                  cursor:'pointer',
-                  fontWeight:600
-                }}
+                className="button-secondary"
+                style={{flex:1}}
               >
                 ✗ Cancel
               </button>
