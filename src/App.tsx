@@ -55,7 +55,7 @@ export default function App() {
       <main>
         <Suspense fallback={<div className="card" style={{padding:20}}>Loading...</div>}>
           <Routes>
-            <Route path="/" element={<DashboardPage />} />
+            <Route path="/" element={<TransactionsPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/budgets" element={<BudgetsPage />} />
             <Route path="/transactions" element={<TransactionsPage />} />

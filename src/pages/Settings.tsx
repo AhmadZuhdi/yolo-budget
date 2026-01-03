@@ -136,7 +136,20 @@ export default function SettingsPage() {
           return
         }
         
+        // Preserve sensitive data before import
+        const existingToken = await db.getMeta<string>('githubToken')
+        const existingGistUrl = await db.getMeta<string>('gistUrl')
+        
         await db.importAll(parsed, { clearBefore: true })
+        
+        // Restore sensitive data after import
+        if (existingToken) {
+          await db.setMeta('githubToken', existingToken)
+        }
+        if (existingGistUrl) {
+          await db.setMeta('gistUrl', existingGistUrl)
+        }
+        
         alert('Import successful! Refreshing page...')
         window.location.reload()
       } catch (e: any) {
@@ -323,7 +336,20 @@ export default function SettingsPage() {
         return
       }
       
+      // Preserve sensitive data before import
+      const existingToken = await db.getMeta<string>('githubToken')
+      const existingGistUrl = await db.getMeta<string>('gistUrl')
+      
       await db.importAll(parsed, { clearBefore: true })
+      
+      // Restore sensitive data after import
+      if (existingToken) {
+        await db.setMeta('githubToken', existingToken)
+      }
+      if (existingGistUrl) {
+        await db.setMeta('gistUrl', existingGistUrl)
+      }
+      
       alert('Import successful! Refreshing page...')
       window.location.reload()
     } catch (e: any) {

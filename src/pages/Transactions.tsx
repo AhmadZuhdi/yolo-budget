@@ -232,10 +232,8 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setTags([])
-        const defAcc = await db.getMeta<string>('defaultAccountId')
-        const defBud = await db.getMeta<string>('defaultBudgetId')
-        setLineA({ accountId: defAcc || undefined })
-        setBudgetId(defBud || '')
+        // Keep the previously selected account/budget, clear amounts
+        setLineA({ accountId: lineA.accountId })
         setLineB({})
       } catch (e: any) {
         alert(e.message)
@@ -279,10 +277,8 @@ export default function TransactionsPage() {
         setItems(await db.getAll('transactions'))
         setDesc('')
         setTags([])
-        const defAcc = await db.getMeta<string>('defaultAccountId')
-        const defBud = await db.getMeta<string>('defaultBudgetId')
-        setLineA({ accountId: defAcc || undefined })
-        setBudgetId(defBud || '')
+        // Keep the previously selected account/budget, clear amounts
+        setLineA({ accountId: lineA.accountId })
         setLineB({})
       } catch (e: any) {
         alert(e.message)
