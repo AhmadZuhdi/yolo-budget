@@ -40,15 +40,26 @@ export type RecurringTransaction = {
   active: boolean
 }
 
+export type StagedTransaction = {
+  id: string
+  accountId: string
+  date: string
+  description?: string
+  budgetId?: string
+  tags?: string[]
+  lines: TransactionLine[]
+}
+
 let dbPromise: Promise<IDBPDatabase<unknown>>
 
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB('yolo-budget-db', 4, {
+    dbPromise = openDB('yolo-budget-db', 5, {
       upgrade(db, oldVersion) {
         if (!db.objectStoreNames.contains('accounts')) db.createObjectStore('accounts', { keyPath: 'id' })
         if (!db.objectStoreNames.contains('budgets')) db.createObjectStore('budgets', { keyPath: 'id' })
         if (!db.objectStoreNames.contains('transactions')) db.createObjectStore('transactions', { keyPath: 'id' })
+        if (!db.objectStoreNames.contains('stagedTransactions')) db.createObjectStore('stagedTransactions', { keyPath: 'id' })
         if (!db.objectStoreNames.contains('syncQueue')) db.createObjectStore('syncQueue', { keyPath: 'id' })
         if (!db.objectStoreNames.contains('meta')) db.createObjectStore('meta', { keyPath: 'key' })
         if (!db.objectStoreNames.contains('recurringTransactions')) db.createObjectStore('recurringTransactions', { keyPath: 'id' })
@@ -332,5 +343,92 @@ export const db = {
       }
       default: return false
     }
+  },
+
+  // Staged transactions (commit-style workflow)
+  async getStagedTransactions(accountId: string): Promise<StagedTransaction[]> {
+    const allStaged = await this.getAll<StagedTransaction>('stagedTransactions')
+    return allStaged.filter(st => st.accountId === accountId)
+  },
+
+  async addStagedTransaction(tx: StagedTransaction) {
+    return this.add('stagedTransactions', tx)
+  },
+
+  async deleteStagedTransaction(txId: string) {
+    return this.delete('stagedTransactions', txId)
+  },
+
+  async clearStagedTransactions(accountId: string) {
+    const allStaged = await this.getAll<StagedTransaction>('stagedTransactions')
+    const dbInst = await getDB()
+    const tx = dbInst.transaction('stagedTransactions', 'readwrite')
+    for (const st of allStaged) {
+      if (st.accountId === accountId) {
+        await tx.store.delete(st.id)
+      }
+    }
+  },
+
+  async commitStagedTransactions(accountId: string, realCurrentAmount: number): Promise<Transaction[]> {
+    const staged = await this.getStagedTransactions(accountId)
+    if (staged.length === 0) {
+      throw new Error('No staged transactions to commit')
+    }
+
+    // Get current account balance
+    const account = await this.get<Account>('accounts', accountId)
+    if (!account) throw new Error('Account not found')
+
+    // Calculate expected balance after staged transactions
+    let expectedBalance = account.balance || 0
+    const allTransactions: Transaction[] = []
+
+    // Create transactions from staged
+    for (const st of staged) {
+      const tx: Transaction = {
+        id: st.id,
+        date: st.date,
+        description: st.description,
+        budgetId: st.budgetId,
+        tags: st.tags,
+        lines: st.lines
+      }
+      allTransactions.push(tx)
+      
+      // Sum up the account's line changes
+      const accountLine = st.lines.find(l => l.accountId === accountId)
+      if (accountLine) {
+        expectedBalance += accountLine.amount
+      }
+    }
+
+    // Create reconciliation transaction if needed
+    if (Math.abs((realCurrentAmount - expectedBalance)) > 1e-6) {
+      const difference = realCurrentAmount - expectedBalance
+      const reconcileTx: Transaction = {
+        id: `reconcile:${Date.now()}`,
+        date: new Date().toISOString().slice(0, 10),
+        description: `Reconciliation adjustment (expected ${expectedBalance.toFixed(2)}, actual ${realCurrentAmount.toFixed(2)})`,
+        lines: [
+          { accountId, amount: difference }
+        ]
+      }
+      allTransactions.push(reconcileTx)
+    }
+
+    // Save all transactions
+    for (const tx of allTransactions) {
+      await this.put('transactions', tx)
+    }
+
+    // Update account balance
+    account.balance = realCurrentAmount
+    await this.put('accounts', account)
+
+    // Clear staged transactions
+    await this.clearStagedTransactions(accountId)
+
+    return allTransactions
   }
 }
