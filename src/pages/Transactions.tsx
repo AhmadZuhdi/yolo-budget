@@ -41,6 +41,16 @@ export default function TransactionsPage() {
   const [tagInputValue, setTagInputValue] = useState('')
   const [lineA, setLineA] = useState<{accountId?:string;amount?:number}>({})
   const [lineB, setLineB] = useState<{accountId?:string;amount?:number}>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
+  
+  // Quick transfer state
+  const [showTransfer, setShowTransfer] = useState(false)
+  const [transferFrom, setTransferFrom] = useState('')
+  const [transferTo, setTransferTo] = useState('')
+  const [transferAmount, setTransferAmount] = useState('')
+  const [transferDesc, setTransferDesc] = useState('')
+  const [transferFee, setTransferFee] = useState('')
+  const [transferFeeAccount, setTransferFeeAccount] = useState('')
   
   // Push modal state
   const [showPushModal, setShowPushModal] = useState(false)
@@ -154,6 +164,18 @@ export default function TransactionsPage() {
   async function commitTransaction() {
     if (!selectedAccountId) {
       alert('Please select an account')
+      return
+    }
+
+    if (editingId) {
+      const isStaged = stagedTransactions.some(t => t.id === editingId)
+      const isPushed = items.some(t => t.id === editingId)
+      
+      if (isStaged) {
+        await updateStagedTransaction()
+      } else if (isPushed) {
+        await updatePushedTransaction()
+      }
       return
     }
 
@@ -279,6 +301,224 @@ export default function TransactionsPage() {
       alert('Push error: ' + e.message)
     } finally {
       setPushing(false)
+    }
+  }
+
+  function startEditStagedTransaction(txId: string) {
+    const tx = stagedTransactions.find(t => t.id === txId)
+    if (!tx) return
+    setEditingId(tx.id)
+    setDesc(tx.description || '')
+    setDate(tx.date)
+    setBudgetId(tx.budgetId || '')
+    setTags(tx.tags ? tx.tags.map((tag, index) => ({ id: String(index), text: tag })) : [])
+    setLineA({ accountId: tx.lines[0]?.accountId, amount: tx.lines[0]?.amount })
+    if (tx.lines[1]) {
+      setLineB({ accountId: tx.lines[1]?.accountId, amount: tx.lines[1]?.amount })
+    }
+  }
+
+  function startEditPushedTransaction(txId: string) {
+    const tx = items.find(t => t.id === txId)
+    if (!tx) return
+    setEditingId(tx.id)
+    setDesc(tx.description || '')
+    setDate(tx.date)
+    setBudgetId(tx.budgetId || '')
+    setTags(tx.tags ? tx.tags.map((tag, index) => ({ id: String(index), text: tag })) : [])
+    setLineA({ accountId: tx.lines[0]?.accountId, amount: tx.lines[0]?.amount })
+    if (tx.lines[1]) {
+      setLineB({ accountId: tx.lines[1]?.accountId, amount: tx.lines[1]?.amount })
+    }
+  }
+
+  async function updateStagedTransaction() {
+    if (!editingId) return
+    const stxIndex = stagedTransactions.findIndex(t => t.id === editingId)
+    if (stxIndex === -1) return
+
+    const aAmt = Number(lineA.amount || 0)
+    if (aAmt === 0) {
+      alert('Amount cannot be 0')
+      return
+    }
+
+    if (!doubleEntry) {
+      const updatedTx: StagedTransaction = {
+        id: editingId,
+        accountId: selectedAccountId,
+        date,
+        description: desc,
+        budgetId: budgetId || undefined,
+        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
+        lines: [{ accountId: lineA.accountId!, amount: aAmt }]
+      }
+      
+      try {
+        await db.deleteStagedTransaction(editingId)
+        await db.addStagedTransaction(updatedTx)
+        setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
+        setEditingId(null)
+        setDesc('')
+        setTags([])
+        setLineA({})
+        setLineB({})
+        alert('✅ Staged transaction updated!')
+      } catch (e: any) {
+        alert(e.message)
+      }
+    } else {
+      const bAmt = Number(lineB.amount || 0)
+      if (bAmt === 0) {
+        alert('Amount cannot be 0')
+        return
+      }
+      if (Math.abs(aAmt + bAmt) > 1e-6) {
+        alert('Transaction must balance (sum of lines = 0)')
+        return
+      }
+
+      const updatedTx: StagedTransaction = {
+        id: editingId,
+        accountId: selectedAccountId,
+        date,
+        description: desc,
+        budgetId: budgetId || undefined,
+        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
+        lines: [
+          { accountId: lineA.accountId!, amount: aAmt },
+          { accountId: lineB.accountId!, amount: bAmt }
+        ]
+      }
+      
+      try {
+        await db.deleteStagedTransaction(editingId)
+        await db.addStagedTransaction(updatedTx)
+        setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
+        setEditingId(null)
+        setDesc('')
+        setTags([])
+        setLineA({})
+        setLineB({})
+        alert('✅ Staged transaction updated!')
+      } catch (e: any) {
+        alert(e.message)
+      }
+    }
+  }
+
+  async function updatePushedTransaction() {
+    if (!editingId) return
+    const tx = items.find(t => t.id === editingId)
+    if (!tx) return
+
+    const aAmt = Number(lineA.amount || 0)
+    if (aAmt === 0) {
+      alert('Amount cannot be 0')
+      return
+    }
+
+    const updatedTx: Transaction = {
+      id: editingId,
+      date,
+      description: desc,
+      budgetId: budgetId || undefined,
+      tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
+      lines: [{ accountId: lineA.accountId!, amount: aAmt }]
+    }
+
+    if (doubleEntry) {
+      const bAmt = Number(lineB.amount || 0)
+      if (bAmt === 0) {
+        alert('Amount cannot be 0')
+        return
+      }
+      if (Math.abs(aAmt + bAmt) > 1e-6) {
+        alert('Transaction must balance (sum of lines = 0)')
+        return
+      }
+      updatedTx.lines = [
+        { accountId: lineA.accountId!, amount: aAmt },
+        { accountId: lineB.accountId!, amount: bAmt }
+      ]
+    }
+
+    try {
+      await db.updateTransaction(updatedTx)
+      setItems(await db.getAll('transactions'))
+      setEditingId(null)
+      setDesc('')
+      setTags([])
+      setLineA({})
+      setLineB({})
+      alert('✅ Transaction updated!')
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
+  async function quickTransfer() {
+    if (!transferFrom || !transferTo || !transferAmount) {
+      alert('Please fill in all transfer fields')
+      return
+    }
+
+    if (transferFrom === transferTo) {
+      alert('Cannot transfer to the same account')
+      return
+    }
+
+    if (!selectedAccountId) {
+      alert('Please select an account first')
+      return
+    }
+
+    const amount = Number(transferAmount)
+    if (amount <= 0) {
+      alert('Transfer amount must be positive')
+      return
+    }
+
+    const fee = transferFee ? Number(transferFee) : 0
+    if (fee < 0) {
+      alert('Transfer fee cannot be negative')
+      return
+    }
+
+    if (fee > 0 && !transferFeeAccount) {
+      alert('Please select which account to charge the fee to')
+      return
+    }
+
+    try {
+      const lines: TransactionLine[] = [
+        { accountId: transferFrom, amount: -amount },
+        { accountId: transferTo, amount: amount }
+      ]
+
+      if (fee > 0) {
+        lines.push({ accountId: transferFeeAccount, amount: -fee })
+      }
+
+      const stagedTx: StagedTransaction = {
+        id: `tx:${Date.now()}`,
+        accountId: selectedAccountId,
+        date,
+        description: transferDesc || `Transfer from ${getAccountName(transferFrom)} to ${getAccountName(transferTo)}${fee > 0 ? ` (fee: ${formatCurrency(fee, currency)})` : ''}`,
+        lines: lines
+      }
+
+      await db.addStagedTransaction(stagedTx)
+      setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
+      setTransferFrom('')
+      setTransferTo('')
+      setTransferAmount('')
+      setTransferDesc('')
+      setTransferFee('')
+      setTransferFeeAccount('')
+      alert(`✅ Transfer staged successfully!${fee > 0 ? ` (Fee: ${formatCurrency(fee, currency)})` : ''} Review in staged transactions and push when ready.`)
+    } catch (e: any) {
+      alert('Transfer failed: ' + e.message)
     }
   }
 
@@ -440,7 +680,89 @@ export default function TransactionsPage() {
               </div>
             )}
             
-            <button onClick={commitTransaction} style={{marginTop:8}} className="button-primary">💾 Commit</button>
+            <button onClick={commitTransaction} style={{marginTop:8}} className="button-primary">{editingId ? '💾 Update' : '💾 Commit'}</button>
+            {editingId && (
+              <button onClick={() => {setEditingId(null); setDesc(''); setTags([]); setLineA({}); setLineB({})}} style={{marginTop:8, marginLeft: 8}} className="button-secondary">Cancel Edit</button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Quick Transfer Section */}
+      <div className="card" style={{marginBottom: 24, background: 'linear-gradient(135deg, var(--accent-light), var(--bg-secondary))'}}>
+        <h3 
+          style={{marginTop: 0, marginBottom: showTransfer ? 12 : 0, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}
+          onClick={() => setShowTransfer(!showTransfer)}
+        >
+          <span>🔄 Quick Transfer Between Accounts</span>
+          <span style={{fontSize: '1.2rem'}}>{showTransfer ? '▼' : '▶'}</span>
+        </h3>
+
+        {showTransfer && (
+          <>
+            <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 12}}>Transfer money between accounts instantly</p>
+            
+            <div style={{display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center', marginBottom: 8}}>
+              <select value={transferFrom} onChange={(e)=>setTransferFrom(e.target.value)}>
+                <option value="">From account...</option>
+                {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+              <span style={{fontSize: '1.25rem', color: 'var(--accent)'}}>→</span>
+              <select value={transferTo} onChange={(e)=>setTransferTo(e.target.value)}>
+                <option value="">To account...</option>
+                {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            
+            <input 
+              type="number" 
+              placeholder="Amount to transfer" 
+              value={transferAmount} 
+              onChange={(e)=>setTransferAmount(e.target.value)}
+              style={{marginBottom: 8}}
+              min="0"
+              step="0.01"
+            />
+
+            <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8}}>
+              <input 
+                type="number" 
+                placeholder="Transfer fee (optional)" 
+                value={transferFee} 
+                onChange={(e)=>setTransferFee(e.target.value)}
+                min="0"
+                step="0.01"
+              />
+              <select 
+                value={transferFeeAccount} 
+                onChange={(e)=>setTransferFeeAccount(e.target.value)}
+                disabled={!transferFee || Number(transferFee) === 0}
+                style={{opacity: !transferFee || Number(transferFee) === 0 ? 0.5 : 1}}
+              >
+                <option value="">Charge fee to...</option>
+                {accounts.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            
+            <input 
+              placeholder="Description (optional)" 
+              value={transferDesc} 
+              onChange={(e)=>setTransferDesc(e.target.value)}
+              style={{marginBottom: 8}}
+            />
+
+            <div style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 12, padding: '8px', background: 'var(--bg)', borderRadius: 4}}>
+              <strong>Fee Info:</strong> If a fee is set, it will create a transaction with 3 lines:
+              <ul style={{margin: '4px 0', paddingLeft: 16}}>
+                <li>From account: -{formatCurrency(Number(transferAmount) || 0, currency)}</li>
+                <li>To account: +{formatCurrency(Number(transferAmount) || 0, currency)}</li>
+                {transferFee && Number(transferFee) > 0 && <li>Fee account: -{formatCurrency(Number(transferFee), currency)}</li>}
+              </ul>
+            </div>
+            
+            <button onClick={quickTransfer} className="button-primary" style={{width: '100%', background: 'var(--success, #4caf50)'}}>
+              🔄 Transfer {transferAmount && `${formatCurrency(Number(transferAmount), currency)}`}{transferFee && Number(transferFee) > 0 && ` + ${formatCurrency(Number(transferFee), currency)} fee`}
+            </button>
           </>
         )}
       </div>
@@ -456,6 +778,7 @@ export default function TransactionsPage() {
           <div style={{display: 'grid', gap: 8}}>
             {stagedTransactions.map((tx) => {
               const accountLine = tx.lines.find(l => l.accountId === selectedAccountId)
+              const isTransfer = tx.lines.length > 1
               return (
                 <div 
                   key={tx.id}
@@ -474,15 +797,45 @@ export default function TransactionsPage() {
                     <div style={{fontSize: '0.875rem', color: 'var(--text-secondary)'}}>
                       {tx.date} · {tx.budgetId ? budgets.find(b => b.id === tx.budgetId)?.name : 'No budget'}
                     </div>
+                    {isTransfer && (
+                      <div style={{fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 4}}>
+                        {tx.lines.map((line, idx) => (
+                          <div key={idx}>
+                            {getAccountName(line.accountId)}: {line.amount >= 0 ? '+' : ''}{formatCurrency(line.amount, currency)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div style={{display: 'flex', alignItems: 'center', gap: 16}}>
+                  <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
                     <div style={{
                       fontSize: '1.125rem',
                       fontWeight: 600,
-                      color: (accountLine?.amount || 0) >= 0 ? 'var(--success, #4caf50)' : 'var(--warning, #ff9800)'
+                      color: (accountLine?.amount || 0) >= 0 ? 'var(--success, #4caf50)' : 'var(--warning, #ff9800)',
+                      textAlign: 'right'
                     }}>
-                      {(accountLine?.amount || 0) >= 0 ? '+' : ''}{formatCurrency(accountLine?.amount || 0, currency)}
+                      {isTransfer ? (
+                        <div style={{fontSize: '0.875rem', opacity: 0.7}}>Transfer</div>
+                      ) : (
+                        <>
+                          {(accountLine?.amount || 0) >= 0 ? '+' : ''}{formatCurrency(accountLine?.amount || 0, currency)}
+                        </>
+                      )}
                     </div>
+                    <button 
+                      onClick={() => startEditStagedTransaction(tx.id)}
+                      style={{
+                        padding: '4px 8px',
+                        background: 'var(--accent)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      Edit
+                    </button>
                     <button 
                       onClick={() => deleteStagedTransaction(tx.id)}
                       style={{
@@ -873,6 +1226,7 @@ export default function TransactionsPage() {
                       zIndex: 999,
                       overflow: 'hidden'
                     }}>
+                      <button onClick={() => { startEditPushedTransaction(tx.id); setOpenMenuId(null) }} style={{display: 'block', width: '100%', padding: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', fontSize: '0.875rem'}}>✏️ Edit</button>
                       <button onClick={() => { convertToRecurring(tx); setOpenMenuId(null) }} style={{display: 'block', width: '100%', padding: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', fontSize: '0.875rem'}}>📅 Convert to Recurring</button>
                       <button onClick={() => { remove(tx.id); setOpenMenuId(null) }} style={{display: 'block', width: '100%', padding: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', fontSize: '0.875rem', color: 'var(--warning, #ff9800)'}}>🗑️ Delete</button>
                     </div>
@@ -935,6 +1289,14 @@ export default function TransactionsPage() {
                             zIndex: 999,
                             overflow: 'hidden'
                           }}>
+                            <button 
+                              onClick={() => {convertToRecurring(tx); setOpenMenuId(null)}}
+                              style={{width: '100%', padding: '10px 16px', textAlign: 'left', background: 'var(--bg-secondary)', border: 'none', cursor: 'pointer', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 8}}
+                              onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
+                              onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}
+                            >
+                              <span>✏️</span> Edit
+                            </button>
                             <button 
                               onClick={() => {convertToRecurring(tx); setOpenMenuId(null)}}
                               style={{width: '100%', padding: '10px 16px', textAlign: 'left', background: 'var(--bg-secondary)', border: 'none', cursor: 'pointer', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 8}}
