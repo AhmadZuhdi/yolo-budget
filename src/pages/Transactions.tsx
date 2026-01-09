@@ -23,7 +23,6 @@ export default function TransactionsPage() {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [currency, setCurrency] = useState('USD')
-  const [doubleEntry, setDoubleEntry] = useState(true)
   const [loading, setLoading] = useState(true)
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 640)
   
@@ -100,16 +99,14 @@ export default function TransactionsPage() {
       db.getAll<Account>('accounts'),
       db.getMeta<string>('currency'),
       db.getAll<Budget>('budgets'),
-      db.getMeta<boolean>('doubleEntry'),
       db.getMeta<number>('itemsPerPage'),
       db.getMeta<number>('paginationPage')
-    ]).then(([transactions, accs, curr, buds, de, savedItemsPerPage, savedPage]) => {
+    ]).then(([transactions, accs, curr, buds, savedItemsPerPage, savedPage]) => {
       if (mounted) {
         setItems(transactions)
         setAccounts(accs)
         setCurrency(curr || 'USD')
         setBudgets(buds)
-        setDoubleEntry(de !== false)
         if (accs.length > 0) {
           setSelectedAccountId(accs[0].id)
         }
@@ -192,73 +189,29 @@ export default function TransactionsPage() {
       return
     }
 
-    if (!doubleEntry) {
-      // Simple mode: single line
-      const tx: StagedTransaction = {
-        id: `tx:${Date.now()}`,
-        accountId: selectedAccountId,
-        date,
-        description: desc,
-        budgetId: budgetId || undefined,
-        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
-        lines: [
-          { accountId: lineA.accountId, amount: aAmt }
-        ]
-      }
+    // Single-entry mode
+    const tx: StagedTransaction = {
+      id: `tx:${Date.now()}`,
+      accountId: selectedAccountId,
+      date,
+      description: desc,
+      budgetId: budgetId || undefined,
+      tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
+      lines: [
+        { accountId: lineA.accountId, amount: aAmt }
+      ]
+    }
 
-      try {
-        await db.addStagedTransaction(tx)
-        setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
-        setDesc('')
-        setTags([])
-        setLineA({ accountId: lineA.accountId })
-        setLineB({})
-      } catch (e: any) {
-        alert(e.message)
-      }
-    } else {
-      // Double-entry mode
-      // Use selected account for lineB if not already set
-      if (!lineB.accountId) {
-        setLineB(s => ({...s, accountId: selectedAccountId}))
-        return
-      }
-
-      const bAmt = Number(lineB.amount || 0)
-      
-      if (bAmt === 0) {
-        alert('Amount cannot be 0')
-        return
-      }
-      
-      if (Math.abs(aAmt + bAmt) > 1e-6) {
-        alert('Transaction must balance (sum of lines = 0)')
-        return
-      }
-
-      const tx: StagedTransaction = {
-        id: `tx:${Date.now()}`,
-        accountId: selectedAccountId,
-        date,
-        description: desc,
-        budgetId: budgetId || undefined,
-        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
-        lines: [
-          { accountId: lineA.accountId, amount: aAmt },
-          { accountId: lineB.accountId, amount: bAmt }
-        ]
-      }
-
-      try {
-        await db.addStagedTransaction(tx)
-        setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
-        setDesc('')
-        setTags([])
-        setLineA({ accountId: lineA.accountId })
-        setLineB({})
-      } catch (e: any) {
-        alert(e.message)
-      }
+    try {
+      await db.addStagedTransaction(tx)
+      setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
+      setDesc('')
+      setTags([])
+      setLineA({ accountId: lineA.accountId })
+      setLineB({})
+      alert('✅ Staged transaction added to queue!')
+    } catch (e: any) {
+      alert(e.message)
     }
   }
 
@@ -343,67 +296,28 @@ export default function TransactionsPage() {
       return
     }
 
-    if (!doubleEntry) {
-      const updatedTx: StagedTransaction = {
-        id: editingId,
-        accountId: selectedAccountId,
-        date,
-        description: desc,
-        budgetId: budgetId || undefined,
-        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
-        lines: [{ accountId: lineA.accountId!, amount: aAmt }]
-      }
-      
-      try {
-        await db.deleteStagedTransaction(editingId)
-        await db.addStagedTransaction(updatedTx)
-        setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
-        setEditingId(null)
-        setDesc('')
-        setTags([])
-        setLineA({})
-        setLineB({})
-        alert('✅ Staged transaction updated!')
-      } catch (e: any) {
-        alert(e.message)
-      }
-    } else {
-      const bAmt = Number(lineB.amount || 0)
-      if (bAmt === 0) {
-        alert('Amount cannot be 0')
-        return
-      }
-      if (Math.abs(aAmt + bAmt) > 1e-6) {
-        alert('Transaction must balance (sum of lines = 0)')
-        return
-      }
-
-      const updatedTx: StagedTransaction = {
-        id: editingId,
-        accountId: selectedAccountId,
-        date,
-        description: desc,
-        budgetId: budgetId || undefined,
-        tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
-        lines: [
-          { accountId: lineA.accountId!, amount: aAmt },
-          { accountId: lineB.accountId!, amount: bAmt }
-        ]
-      }
-      
-      try {
-        await db.deleteStagedTransaction(editingId)
-        await db.addStagedTransaction(updatedTx)
-        setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
-        setEditingId(null)
-        setDesc('')
-        setTags([])
-        setLineA({})
-        setLineB({})
-        alert('✅ Staged transaction updated!')
-      } catch (e: any) {
-        alert(e.message)
-      }
+    const updatedTx: StagedTransaction = {
+      id: editingId,
+      accountId: selectedAccountId,
+      date,
+      description: desc,
+      budgetId: budgetId || undefined,
+      tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
+      lines: [{ accountId: lineA.accountId!, amount: aAmt }]
+    }
+    
+    try {
+      await db.deleteStagedTransaction(editingId)
+      await db.addStagedTransaction(updatedTx)
+      setStagedTransactions(await db.getStagedTransactions(selectedAccountId))
+      setEditingId(null)
+      setDesc('')
+      setTags([])
+      setLineA({})
+      setLineB({})
+      alert('✅ Staged transaction updated!')
+    } catch (e: any) {
+      alert(e.message)
     }
   }
 
@@ -425,22 +339,6 @@ export default function TransactionsPage() {
       budgetId: budgetId || undefined,
       tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
       lines: [{ accountId: lineA.accountId!, amount: aAmt }]
-    }
-
-    if (doubleEntry) {
-      const bAmt = Number(lineB.amount || 0)
-      if (bAmt === 0) {
-        alert('Amount cannot be 0')
-        return
-      }
-      if (Math.abs(aAmt + bAmt) > 1e-6) {
-        alert('Transaction must balance (sum of lines = 0)')
-        return
-      }
-      updatedTx.lines = [
-        { accountId: lineA.accountId!, amount: aAmt },
-        { accountId: lineB.accountId!, amount: bAmt }
-      ]
     }
 
     try {
@@ -669,18 +567,12 @@ export default function TransactionsPage() {
             
             <div style={{display:'flex',gap:8,marginTop:8}}>
               <input 
-                placeholder={doubleEntry ? "Amount" : "Amount (+income / -expense)"} 
+                placeholder="Amount (+income / -expense)" 
                 type="number" 
                 value={lineA.amount||''} 
                 onChange={(e)=>setLineA(s=>({...s,amount: Number(e.target.value)}))} 
               />
             </div>
-            
-            {doubleEntry && (
-              <div style={{display:'flex',gap:8,marginTop:8}}>
-                <input placeholder="Amount (negative)" type="number" value={lineB.amount||''} onChange={(e)=>setLineB(s=>({...s,amount: Number(e.target.value)}))} />
-              </div>
-            )}
             
             <button onClick={commitTransaction} style={{marginTop:8}} className="button-primary">{editingId ? '💾 Update' : '💾 Commit'}</button>
             {editingId && (
@@ -1316,7 +1208,7 @@ export default function TransactionsPage() {
                             overflow: 'hidden'
                           }}>
                             <button 
-                              onClick={() => {convertToRecurring(tx); setOpenMenuId(null)}}
+                              onClick={() => {startEditPushedTransaction(tx.id); setOpenMenuId(null)}}
                               style={{width: '100%', padding: '10px 16px', textAlign: 'left', background: 'var(--bg-secondary)', border: 'none', cursor: 'pointer', fontSize: '0.875rem', display: 'flex', alignItems: 'center', gap: 8}}
                               onMouseEnter={(e) => e.currentTarget.style.background = 'var(--accent-light)'}
                               onMouseLeave={(e) => e.currentTarget.style.background = 'var(--bg-secondary)'}

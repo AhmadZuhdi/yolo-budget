@@ -132,9 +132,7 @@ export const db = {
 
   // Helpers for bookkeeping
   async addTransaction(tx: Transaction) {
-    // Ensure double-entry: sum of amounts should be 0
-    const sum = tx.lines.reduce((s, l) => s + l.amount, 0)
-    if (Math.abs(sum) > 1e-6) throw new Error('Transaction not balanced')
+    // Add transaction
     await this.put('transactions', tx)
     // update account balances (best-effort, concurrency caveats)
     for (const line of tx.lines) {
@@ -161,8 +159,6 @@ export const db = {
       }
     }
     // apply new lines
-    const sum = tx.lines.reduce((s, l) => s + l.amount, 0)
-    if (Math.abs(sum) > 1e-6) throw new Error('Transaction not balanced')
     await this.put('transactions', tx)
     for (const line of tx.lines) {
       const acc = await this.get<Account>('accounts', line.accountId)
