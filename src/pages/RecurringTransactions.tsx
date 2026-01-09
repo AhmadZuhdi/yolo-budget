@@ -39,7 +39,6 @@ export default function RecurringTransactionsPage() {
   const [lineB, setLineB] = useState<{accountId?: string; amount?: number}>({})
   const [editingId, setEditingId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [doubleEntry, setDoubleEntry] = useState(true)
   const [isMobile, setIsMobile] = useState(window.innerWidth < 640)
   const [isTransfer, setIsTransfer] = useState(false)
   const [transferFee, setTransferFee] = useState('')
@@ -76,18 +75,16 @@ export default function RecurringTransactionsPage() {
   }, [])
 
   async function loadData() {
-    const [recurring, accs, buds, curr, mode] = await Promise.all([
+    const [recurring, accs, buds, curr] = await Promise.all([
       db.getAll<RecurringTransaction>('recurringTransactions'),
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
-      db.getMeta<string>('currency'),
-      db.getMeta<boolean>('doubleEntry')
+      db.getMeta<string>('currency')
     ])
     setItems(recurring)
     setAccounts(accs)
     setBudgets(buds)
     setCurrency(curr || 'USD')
-    setDoubleEntry(mode !== false)
     setLoading(false)
   }
 
@@ -137,16 +134,13 @@ export default function RecurringTransactionsPage() {
       resetForm()
     } else {
       // Regular transaction mode
-      if (doubleEntry) {
-        if (!lineB.accountId) {
-          alert('Please select second account for double-entry mode')
-          return
-        }
-        const bAmt = Number(lineB.amount || 0)
-        if (Math.abs(aAmt + bAmt) > 1e-6) {
-          alert('Transaction must balance (sum of lines = 0)')
-          return
-        }
+      const lines: TransactionLine[] = []
+      if (lineA.accountId) lines.push({ accountId: lineA.accountId!, amount: aAmt })
+      if (lineB.accountId) lines.push({ accountId: lineB.accountId!, amount: Number(lineB.amount || 0) })
+      
+      if (lines.length === 0) {
+        alert('Please select at least one account')
+        return
       }
 
       const recurring: RecurringTransaction = {
@@ -157,12 +151,7 @@ export default function RecurringTransactionsPage() {
         endDate: endDate || undefined,
         budgetId: budgetId || undefined,
         tags: tags.length > 0 ? tags.map(t => t.text) : undefined,
-        lines: doubleEntry && lineB.accountId
-          ? [
-              { accountId: lineA.accountId!, amount: aAmt },
-              { accountId: lineB.accountId!, amount: Number(lineB.amount || 0) }
-            ]
-          : [{ accountId: lineA.accountId!, amount: aAmt }],
+        lines: lines,
         active: true
       }
 
@@ -295,8 +284,7 @@ export default function RecurringTransactionsPage() {
           <div className="card" style={{marginBottom: 12}}>
             <h3 style={{marginTop: 0, marginBottom: 16, fontSize: '1rem'}}>
               {editingId ? '✏️ Edit' : '➕ Create'} Recurring {isTransfer ? 'Transfer' : 'Transaction'}
-              {!doubleEntry && !isTransfer && <span style={{marginLeft: 8, fontSize: '0.75rem', color: '#6b7280', display: 'inline-block'}}>(Simple Mode)</span>}
-              {doubleEntry && !isTransfer && <span style={{marginLeft: 8, fontSize: '0.75rem', color: '#6b7280', display: 'inline-block'}}>(Double-Entry)</span>}
+              {isTransfer && <span style={{marginLeft: 8, fontSize: '0.75rem', color: '#6b7280', display: 'inline-block'}}>(Transfer)</span>}
             </h3>
 
             <div style={{marginBottom: 12, display: 'flex', gap: 8}}>
@@ -425,7 +413,7 @@ export default function RecurringTransactionsPage() {
 
             <div style={{marginBottom: 12}}>
               <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 4}}>
-                {isTransfer ? 'From Account' : (doubleEntry ? 'Line 1 (Debit)' : 'Account & Amount')}
+                {isTransfer ? 'From Account' : 'Account & Amount'}
               </label>
               <div style={{display: 'grid', gridTemplateColumns: isTransfer ? '1fr' : '1fr 2fr', gap: 8}}>
                 <select 
@@ -448,7 +436,7 @@ export default function RecurringTransactionsPage() {
               </div>
             </div>
 
-            {(isTransfer || doubleEntry) && (
+            {isTransfer && (
               <div style={{marginBottom: 12}}>
                 <label style={{display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 4}}>
                   {isTransfer ? 'To Account & Amount' : 'Line 2 (Credit)'}

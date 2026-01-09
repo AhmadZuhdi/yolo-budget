@@ -14,7 +14,7 @@ export default defineConfig({
       manifest: {
         name: 'Yolo Budget',
         short_name: 'Yolo',
-        description: 'Offline-first double-entry budgeting app',
+        description: 'Offline-first budgeting app',
         theme_color: '#0ea5a4',
         background_color: '#ffffff',
         display: 'standalone',

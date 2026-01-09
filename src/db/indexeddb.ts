@@ -198,8 +198,6 @@ export const db = {
     if (!r) throw new Error('Recurring transaction not found')
     
     const today = new Date().toISOString().slice(0, 10)
-    const doubleEntry = await this.getMeta<boolean>('doubleEntry')
-    const isDoubleEntry = doubleEntry !== false
     
     console.log(`[ProcessSingle] Processing "${r.description}" on ${today}`)
     
@@ -215,28 +213,8 @@ export const db = {
       }
       
       console.log(`[ProcessSingle] Creating transaction:`, tx)
-      
-      if (isDoubleEntry) {
-        // Validate balanced transaction for double-entry mode
-        const sum = tx.lines.reduce((s, l) => s + l.amount, 0)
-        console.log(`[ProcessSingle] Double-entry mode, balance sum: ${sum}`)
-        if (Math.abs(sum) > 1e-6) {
-          throw new Error(`Not balanced! sum: ${sum}`)
-        }
-        await this.addTransaction(tx)
-      } else {
-        // Simple mode: add transaction and update account balance
-        console.log(`[ProcessSingle] Simple mode, saving transaction`)
-        await this.add('transactions', tx)
-        if (tx.lines[0]) {
-          const acc = await this.get<Account>('accounts', tx.lines[0].accountId)
-          if (acc) {
-            console.log(`[ProcessSingle] Updating balance for account ${tx.lines[0].accountId}: ${acc.balance} + ${tx.lines[0].amount}`)
-            acc.balance = (acc.balance || 0) + tx.lines[0].amount
-            await this.put('accounts', acc)
-          }
-        }
-      }
+      console.log(`[ProcessSingle] Simple mode, saving transaction`)
+      await this.addTransaction(tx)
       
       // Update last processed date
       r.lastProcessed = today
@@ -251,10 +229,8 @@ export const db = {
   async processRecurringTransactions() {
     const recurring = await this.getAll<RecurringTransaction>('recurringTransactions')
     const today = new Date().toISOString().slice(0, 10)
-    const doubleEntry = await this.getMeta<boolean>('doubleEntry')
-    const isDoubleEntry = doubleEntry !== false
     
-    console.log(`[Process] Found ${recurring.length} recurring transactions, mode: ${isDoubleEntry ? 'double-entry' : 'simple'}, today: ${today}`)
+    console.log(`[Process] Found ${recurring.length} recurring transactions, today: ${today}`)
     
     let processed = 0
     for (const r of recurring) {
@@ -285,29 +261,8 @@ export const db = {
           }
           
           console.log(`[Process]   → Creating transaction:`, tx)
-          
-          if (isDoubleEntry) {
-            // Validate balanced transaction for double-entry mode
-            const sum = tx.lines.reduce((s, l) => s + l.amount, 0)
-            console.log(`[Process]   → Double-entry mode, balance sum: ${sum}`)
-            if (Math.abs(sum) > 1e-6) {
-              console.error(`[Process]   → ❌ Not balanced! sum: ${sum}`)
-              continue
-            }
-            await this.addTransaction(tx)
-          } else {
-            // Simple mode: add transaction and update account balance
-            console.log(`[Process]   → Simple mode, saving transaction`)
-            await this.add('transactions', tx)
-            if (tx.lines[0]) {
-              const acc = await this.get<Account>('accounts', tx.lines[0].accountId)
-              if (acc) {
-                console.log(`[Process]   → Updating balance for account ${tx.lines[0].accountId}: ${acc.balance} + ${tx.lines[0].amount}`)
-                acc.balance = (acc.balance || 0) + tx.lines[0].amount
-                await this.put('accounts', acc)
-              }
-            }
-          }
+          console.log(`[Process]   → Simple mode, saving transaction`)
+          await this.addTransaction(tx)
           
           // Update last processed date
           r.lastProcessed = today

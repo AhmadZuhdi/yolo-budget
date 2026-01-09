@@ -4,7 +4,6 @@ import packageJson from '../../package.json'
 
 export default function SettingsPage() {
   const [currency, setCurrency] = useState('USD')
-  const [doubleEntry, setDoubleEntry] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
   const [useBottomNav, setUseBottomNav] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -23,7 +22,6 @@ export default function SettingsPage() {
     let mounted = true
     Promise.all([
       db.getMeta('currency'),
-      db.getMeta('doubleEntry'),
       db.getMeta<boolean>('darkMode'),
       db.getMeta<boolean>('useBottomNav'),
       db.getAll<Account>('accounts'),
@@ -34,10 +32,9 @@ export default function SettingsPage() {
       db.getMeta<number>('monthCycleDay'),
       db.getMeta<string>('gistUrl'),
       db.getMeta<number>('itemsPerPage')
-    ]).then(([curr, de, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay, savedGistUrl, savedItemsPerPage]) => {
+    ]).then(([curr, dark, bottomNav, accs, buds, defAccId, defBudId, ghToken, cycleDay, savedGistUrl, savedItemsPerPage]) => {
       if (mounted) {
         setCurrency(curr || 'USD')
-        setDoubleEntry(de !== false) // default to true
         setDarkMode(dark || false)
         setUseBottomNav(bottomNav || false)
         setAccounts(accs)
@@ -57,11 +54,6 @@ export default function SettingsPage() {
   async function saveCurrency(){
     await db.setMeta('currency', currency)
     alert('Currency saved')
-  }
-
-  async function saveDoubleEntry(){
-    await db.setMeta('doubleEntry', doubleEntry)
-    alert('Double-entry mode saved. Refresh the page to apply changes.')
   }
 
   async function saveDefaults(){
@@ -435,25 +427,6 @@ export default function SettingsPage() {
         <small style={{color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 8, display: 'block'}}>
           The current page and items per page will be automatically remembered when you navigate away.
         </small>
-      </div>
-
-      <div className="card" style={{marginBottom: 20}}>
-        <h3 style={{marginTop: 0, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8}}>
-          <span style={{fontSize: '1.5rem'}}>⚙️</span> Transaction Mode
-        </h3>
-        <p style={{color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: 0, marginBottom: 16}}>
-          Double-entry accounting ensures balanced transactions. Simple mode allows quick income/expense tracking without requiring balanced entries.
-        </p>
-        <label style={{display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', marginBottom: 12}}>
-          <input 
-            type="checkbox" 
-            checked={doubleEntry} 
-            onChange={(e) => setDoubleEntry(e.target.checked)}
-            style={{width: 20, height: 20, cursor: 'pointer'}}
-          />
-          <span style={{fontWeight: 500, color: 'var(--text)'}}>Enable Double-Entry Mode</span>
-        </label>
-        <button onClick={saveDoubleEntry} className="button-primary">💾 Save Transaction Mode</button>
       </div>
 
       <div className="card" style={{marginBottom: 20}}>

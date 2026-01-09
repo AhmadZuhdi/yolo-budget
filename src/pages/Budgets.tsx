@@ -64,7 +64,7 @@ export default function BudgetsPage() {
     for (const tx of cycleTransactions) {
       for (const line of tx.lines) {
         // Count absolute amounts as spending (regardless of sign)
-        // In double-entry, expenses are negative; in simple mode, expenses are also negative
+        // Expenses are negative; sum them up
         if (line.amount < 0) {
           totalSpending += Math.abs(line.amount)
         }

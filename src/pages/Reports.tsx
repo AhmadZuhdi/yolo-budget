@@ -28,7 +28,6 @@ export default function ReportsPage() {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
-  const [doubleEntry, setDoubleEntry] = useState(true)
   const [filterTag, setFilterTag] = useState('')
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'year' | 'all' | 'custom'>('month')
   const [startDate, setStartDate] = useState('')
@@ -40,19 +39,17 @@ export default function ReportsPage() {
   }, [])
 
   async function loadData() {
-    const [txs, accs, buds, curr, de, cycleDay] = await Promise.all([
+    const [txs, accs, buds, curr, cycleDay] = await Promise.all([
       db.getAll<Transaction>('transactions'),
       db.getAll<Account>('accounts'),
       db.getAll<Budget>('budgets'),
       db.getMeta<string>('currency'),
-      db.getMeta<boolean>('doubleEntry'),
       db.getMeta<number>('monthCycleDay')
     ])
     setTransactions(txs)
     setAccounts(accs)
     setBudgets(buds)
     setCurrency(curr || 'USD')
-    setDoubleEntry(de !== false)
     setMonthCycleDay(cycleDay || 1)
     setLoading(false)
   }
@@ -135,16 +132,11 @@ export default function ReportsPage() {
         const accountName = accounts.find(a => a.id === line.accountId)?.name || 'Unknown'
         spendingByAccount[accountName] = (spendingByAccount[accountName] || 0) + Math.abs(line.amount)
       }
-    })
+  // Calculate spending by account
+  Object.keys(spendingByAccount).forEach(key => {
+    // Sum all expenses (negative amounts) for each account
+    spendingByAccount[key] = Math.abs(spendingByAccount[key])
   })
-  
-  // In double-entry mode, each expense is recorded twice (once positive, once negative)
-  // So we divide by 2 to get the actual spending
-  if (doubleEntry) {
-    Object.keys(spendingByAccount).forEach(key => {
-      spendingByAccount[key] /= 2
-    })
-  }
 
   const spendingData = {
     labels: Object.keys(spendingByAccount),
@@ -162,9 +154,7 @@ export default function ReportsPage() {
   nonTransferTxs.forEach(tx => {
     const date = tx.date
     const total = tx.lines.reduce((sum, l) => sum + Math.abs(l.amount), 0)
-    // In double-entry mode, divide by 2 since each transaction is counted twice
-    const adjustedTotal = doubleEntry ? total / 2 : total
-    dailyTotals[date] = (dailyTotals[date] || 0) + adjustedTotal
+    dailyTotals[date] = (dailyTotals[date] || 0) + total
   })
 
   const sortedDates = Object.keys(dailyTotals).sort()
@@ -192,12 +182,6 @@ export default function ReportsPage() {
       }
     })
   })
-
-  // Adjust for double-entry (each transaction counted twice)
-  if (doubleEntry) {
-    totalIncome /= 2
-    totalExpenses /= 2
-  }
 
   const incomeExpenseData = {
     labels: ['Income', 'Expenses'],
@@ -242,14 +226,6 @@ export default function ReportsPage() {
       })
     })
   })
-
-  // Adjust for double-entry
-  if (doubleEntry) {
-    Object.keys(spendingByTag).forEach(tag => {
-      spendingByTag[tag].income /= 2
-      spendingByTag[tag].expenses /= 2
-    })
-  }
 
   const tagEntries = Object.entries(spendingByTag).sort(([, a], [, b]) => b.expenses - a.expenses)
 
