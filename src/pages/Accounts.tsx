@@ -90,21 +90,30 @@ export default function AccountsPage() {
         }
       }
 
-      // Update the account with the recalculated balance
+      // Get current account data
       const acc = await db.get<Account>('accounts', accountId)
-      if (acc) {
-        const oldBalance = acc.balance ?? 0
-        acc.balance = calculatedBalance
-        await db.put('accounts', acc)
-        setItems(await db.getAll('accounts'))
-        
-        const difference = calculatedBalance - oldBalance
-        if (Math.abs(difference) < 0.01) {
-          alert(`✓ Balance already correct: ${formatCurrency(calculatedBalance, currency)}`)
-        } else {
-          alert(`✓ Balance recalculated!\nOld: ${formatCurrency(oldBalance, currency)}\nNew: ${formatCurrency(calculatedBalance, currency)}\nDifference: ${difference > 0 ? '+' : ''}${formatCurrency(difference, currency)}`)
-        }
+      if (!acc) return
+      
+      const oldBalance = acc.balance ?? 0
+      const difference = calculatedBalance - oldBalance
+      
+      // Show detailed confirmation dialog
+      if (Math.abs(difference) < 0.01) {
+        alert(`✓ Balance already correct: ${formatCurrency(calculatedBalance, currency)}`)
+        return
       }
+      
+      const confirmMessage = `Review changes before applying:\n\nCurrent Balance: ${formatCurrency(oldBalance, currency)}\nCalculated Balance: ${formatCurrency(calculatedBalance, currency)}\nDifference: ${difference > 0 ? '+' : ''}${formatCurrency(difference, currency)}\n\nApply these changes?`
+      
+      const confirmed = confirm(confirmMessage)
+      if (!confirmed) return
+      
+      // Update the account with the recalculated balance
+      acc.balance = calculatedBalance
+      await db.put('accounts', acc)
+      setItems(await db.getAll('accounts'))
+      
+      alert(`✓ Balance recalculated!\nOld: ${formatCurrency(oldBalance, currency)}\nNew: ${formatCurrency(calculatedBalance, currency)}`)
     } catch (err) {
       console.error('Error recalculating balance:', err)
       alert('Error recalculating balance')

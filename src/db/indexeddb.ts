@@ -380,9 +380,12 @@ export const db = {
     const account = await this.get<Account>('accounts', accountId)
     if (!account) throw new Error('Account not found')
 
-    // Calculate expected balance after staged transactions
+    // Calculate expected balance after staged transactions for selected account
     let expectedBalance = account.balance || 0
     const allTransactions: Transaction[] = []
+    
+    // Track all accounts affected by these transactions and their balance changes
+    const accountBalanceChanges = new Map<string, number>()
 
     // Create transactions from staged
     for (const st of staged) {
@@ -396,7 +399,15 @@ export const db = {
       }
       allTransactions.push(tx)
       
-      // Sum up the account's line changes
+      // Track balance changes for ALL accounts in this transaction
+      for (const line of st.lines) {
+        accountBalanceChanges.set(
+          line.accountId,
+          (accountBalanceChanges.get(line.accountId) || 0) + line.amount
+        )
+      }
+      
+      // Calculate expected balance for the selected account
       const accountLine = st.lines.find(l => l.accountId === accountId)
       if (accountLine) {
         expectedBalance += accountLine.amount
@@ -415,6 +426,10 @@ export const db = {
         ]
       }
       allTransactions.push(reconcileTx)
+      accountBalanceChanges.set(
+        accountId,
+        (accountBalanceChanges.get(accountId) || 0) + difference
+      )
     }
 
     // Save all transactions
@@ -422,7 +437,16 @@ export const db = {
       await this.put('transactions', tx)
     }
 
-    // Update account balance
+    // Update balances for ALL affected accounts
+    for (const [affectedAccountId, balanceChange] of accountBalanceChanges.entries()) {
+      const acc = await this.get<Account>('accounts', affectedAccountId)
+      if (acc) {
+        acc.balance = (acc.balance || 0) + balanceChange
+        await this.put('accounts', acc)
+      }
+    }
+    
+    // Ensure selected account has the exact realCurrentAmount
     account.balance = realCurrentAmount
     await this.put('accounts', account)
 

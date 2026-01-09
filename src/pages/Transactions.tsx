@@ -528,7 +528,9 @@ export default function TransactionsPage() {
       (t.description && t.description.toLowerCase().includes(searchTerm.toLowerCase()))
     const matchesTag = !filterTag || (t.tags && t.tags.includes(filterTag))
     const matchesBudget = !filterBudget || t.budgetId === filterBudget
-    return matchesSearch && matchesTag && matchesBudget
+    // Filter by selected account - show only transactions that have a line for this account
+    const matchesAccount = !selectedAccountId || t.lines.some(l => l.accountId === selectedAccountId)
+    return matchesSearch && matchesTag && matchesBudget && matchesAccount
   }).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id))
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage)
@@ -1244,6 +1246,7 @@ export default function TransactionsPage() {
                   <th style={{padding: 12, textAlign: 'left', fontSize: '0.875rem'}}>Description</th>
                   <th style={{padding: 12, textAlign: 'left', fontSize: '0.875rem'}}>Accounts</th>
                   <th style={{padding: 12, textAlign: 'right', fontSize: '0.875rem'}}>Amount</th>
+                  <th style={{padding: 12, textAlign: 'left', fontSize: '0.875rem'}}>Tags</th>
                   <th style={{padding: 12, textAlign: 'left', fontSize: '0.875rem'}}>Budget</th>
                   <th style={{padding: 12, textAlign: 'center', fontSize: '0.875rem', width: '60px'}}>Actions</th>
                 </tr>
@@ -1257,7 +1260,30 @@ export default function TransactionsPage() {
                       {tx.lines.map(l => getAccountName(l.accountId)).join(' ↔ ')}
                     </td>
                     <td style={{padding: 12, textAlign: 'right', fontSize: '0.875rem', fontWeight: 600}}>
-                      {tx.lines.filter(l => l.amount > 0).map(l => formatCurrency(l.amount, currency)).join(', ')}
+                      {tx.lines.map(l => `${l.amount > 0 ? '+' : ''}${formatCurrency(l.amount, currency)}`).join(', ')}
+                    </td>
+                    <td style={{padding: 12, fontSize: '0.875rem'}}>
+                      {tx.tags && tx.tags.length > 0 ? (
+                        <div style={{display: 'flex', gap: 4, flexWrap: 'wrap'}}>
+                          {tx.tags.map((tag, idx) => (
+                            <span
+                              key={idx}
+                              onClick={() => setFilterTag(tag)}
+                              style={{
+                                background: filterTag === tag ? 'var(--accent)' : 'var(--accent-light)',
+                                color: filterTag === tag ? 'white' : 'inherit',
+                                padding: '2px 8px',
+                                borderRadius: 4,
+                                fontSize: '0.75rem',
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap'
+                              }}
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      ) : '—'}
                     </td>
                     <td style={{padding: 12, fontSize: '0.875rem'}}>
                       {tx.budgetId ? budgets.find(b => b.id === tx.budgetId)?.name : '—'}
