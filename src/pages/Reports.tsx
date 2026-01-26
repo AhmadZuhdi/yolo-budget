@@ -132,6 +132,9 @@ export default function ReportsPage() {
         const accountName = accounts.find(a => a.id === line.accountId)?.name || 'Unknown'
         spendingByAccount[accountName] = (spendingByAccount[accountName] || 0) + Math.abs(line.amount)
       }
+    })
+  })
+
   // Calculate spending by account
   Object.keys(spendingByAccount).forEach(key => {
     // Sum all expenses (negative amounts) for each account

@@ -50,6 +50,7 @@ export default function TransactionsPage() {
   const [transferDesc, setTransferDesc] = useState('')
   const [transferFee, setTransferFee] = useState('')
   const [transferFeeAccount, setTransferFeeAccount] = useState('')
+  const [transferDate, setTransferDate] = useState(new Date().toISOString().slice(0, 10))
   
   // Push modal state
   const [showPushModal, setShowPushModal] = useState(false)
@@ -60,7 +61,7 @@ export default function TransactionsPage() {
   const [showCreateForm, setShowCreateForm] = useState(true)
   const [showFilters, setShowFilters] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'card' | 'table'>('card')
+  const [viewMode, setViewMode] = useState<'card' | 'table' | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterTag, setFilterTag] = useState('')
   const [filterBudget, setFilterBudget] = useState('')
@@ -100,8 +101,9 @@ export default function TransactionsPage() {
       db.getMeta<string>('currency'),
       db.getAll<Budget>('budgets'),
       db.getMeta<number>('itemsPerPage'),
-      db.getMeta<number>('paginationPage')
-    ]).then(([transactions, accs, curr, buds, savedItemsPerPage, savedPage]) => {
+      db.getMeta<number>('paginationPage'),
+      db.getMeta<'card' | 'table'>('transactionViewMode')
+    ]).then(([transactions, accs, curr, buds, savedItemsPerPage, savedPage, savedViewMode]) => {
       if (mounted) {
         setItems(transactions)
         setAccounts(accs)
@@ -110,11 +112,17 @@ export default function TransactionsPage() {
         if (accs.length > 0) {
           setSelectedAccountId(accs[0].id)
         }
-        if (savedItemsPerPage) {
+        // Restore saved preferences
+        if (typeof savedItemsPerPage === 'number' && savedItemsPerPage > 0) {
           setItemsPerPage(savedItemsPerPage)
         }
-        if (savedPage) {
+        if (typeof savedPage === 'number' && savedPage > 0) {
           setCurrentPage(savedPage)
+        }
+        if (savedViewMode === 'card' || savedViewMode === 'table') {
+          setViewMode(savedViewMode)
+        } else {
+          setViewMode('card')
         }
         setLoading(false)
       }
@@ -129,6 +137,10 @@ export default function TransactionsPage() {
   useEffect(() => {
     db.setMeta('paginationPage', currentPage)
   }, [currentPage])
+
+  useEffect(() => {
+    db.setMeta('transactionViewMode', viewMode)
+  }, [viewMode])
 
   // Load staged transactions for selected account
   useEffect(() => {
@@ -239,12 +251,10 @@ export default function TransactionsPage() {
       
       // Reload transactions and update UI
       const updatedTransactions = await db.getAll<Transaction>('transactions')
-      const updatedAccount = await db.get<Account>('accounts', selectedAccountId)
+      const updatedAccounts = await db.getAll<Account>('accounts')
       
       setItems(updatedTransactions)
-      if (updatedAccount) {
-        setAccounts(accs => accs.map(a => a.id === selectedAccountId ? updatedAccount : a))
-      }
+      setAccounts(updatedAccounts)
       
       setStagedTransactions([])
       setShowPushModal(false)
@@ -401,7 +411,7 @@ export default function TransactionsPage() {
       const stagedTx: StagedTransaction = {
         id: `tx:${Date.now()}`,
         accountId: selectedAccountId,
-        date,
+        date: transferDate,
         description: transferDesc || `Transfer from ${getAccountName(transferFrom)} to ${getAccountName(transferTo)}${fee > 0 ? ` (fee: ${formatCurrency(fee, currency)})` : ''}`,
         lines: lines
       }
@@ -414,6 +424,7 @@ export default function TransactionsPage() {
       setTransferDesc('')
       setTransferFee('')
       setTransferFeeAccount('')
+      setTransferDate(new Date().toISOString().slice(0, 10))
       alert(`✅ Transfer staged successfully!${fee > 0 ? ` (Fee: ${formatCurrency(fee, currency)})` : ''} Review in staged transactions and push when ready.`)
     } catch (e: any) {
       alert('Transfer failed: ' + e.message)
@@ -616,6 +627,13 @@ export default function TransactionsPage() {
               style={{marginBottom: 8}}
               min="0"
               step="0.01"
+            />
+
+            <input 
+              type="date" 
+              value={transferDate} 
+              onChange={(e)=>setTransferDate(e.target.value)}
+              style={{marginBottom: 8}}
             />
 
             <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8}}>
@@ -830,6 +848,47 @@ export default function TransactionsPage() {
               }}
             />
 
+            {realAmount && (
+              (() => {
+                const expectedAmount = (selectedAccount?.balance || 0) + stagedTransactions.reduce((sum, tx) => {
+                  const line = tx.lines.find(l => l.accountId === selectedAccountId)
+                  return sum + (line?.amount || 0)
+                }, 0)
+                const actualAmount = Number(realAmount)
+                const discrepancy = actualAmount - expectedAmount
+                const isPositive = discrepancy > 0
+                const isZero = Math.abs(discrepancy) < 1e-6
+                
+                return (
+                  <div style={{
+                    marginBottom: 16,
+                    padding: 12,
+                    background: isZero ? '#e8f5e9' : isPositive ? '#fff3cd' : '#ffebee',
+                    borderRadius: '4px',
+                    border: `1px solid ${isZero ? '#4caf50' : isPositive ? '#ffc107' : '#f44336'}`,
+                    fontSize: '0.875rem'
+                  }}>
+                    <div style={{marginBottom: 4}}>
+                      <strong>Discrepancy: {discrepancy > 0 ? '+' : ''}{formatCurrency(discrepancy, currency)}</strong>
+                    </div>
+                    {!isZero && (
+                      <div style={{color: isPositive ? '#856404' : '#721c24', fontSize: '0.75rem'}}>
+                        {isPositive 
+                          ? `✓ Actual is ${formatCurrency(discrepancy, currency)} MORE than expected (gain)`
+                          : `⚠ Actual is ${formatCurrency(Math.abs(discrepancy), currency)} LESS than expected (shortage)`
+                        }
+                      </div>
+                    )}
+                    {isZero && (
+                      <div style={{color: '#155724', fontSize: '0.75rem'}}>
+                        ✓ Perfect match! No discrepancy.
+                      </div>
+                    )}
+                  </div>
+                )
+              })()
+            )}
+
             <div style={{display: 'flex', gap: 8}}>
               <button 
                 onClick={() => {
@@ -1041,7 +1100,7 @@ export default function TransactionsPage() {
           <div style={{padding: 24, textAlign: 'center', color: 'var(--text-secondary)'}}>
             No transactions found
           </div>
-        ) : viewMode === 'card' ? (
+        ) : !viewMode || viewMode === 'card' ? (
           <div style={{display: 'grid', gap: isMobile ? 8 : 12, gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))'}}>
             {paginatedItems.map(tx => (
               <div 
