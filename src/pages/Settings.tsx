@@ -17,6 +17,12 @@ export default function SettingsPage() {
   const [importing, setImporting] = useState(false)
   const [monthCycleDay, setMonthCycleDay] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [showImportPreview, setShowImportPreview] = useState(false)
+  const [importPreviewData, setImportPreviewData] = useState<{
+    gistTransactions: any[]
+    localTransactions: any[]
+    parsedData: any
+  } | null>(null)
 
   useEffect(()=>{
     let mounted = true
@@ -324,15 +330,42 @@ export default function SettingsPage() {
       const content = files[0].content
       const parsed = JSON.parse(content)
       
-      if (!confirm('This will erase all current data and import from GitHub Gist. Continue?')) {
-        return
-      }
+      // Get last 5 transactions from gist
+      const gistTransactions = (parsed.transactions || [])
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+      
+      // Get last 5 transactions from local DB
+      const allLocalTransactions = await db.getAll('transactions')
+      const localTransactions = allLocalTransactions
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+      
+      // Show preview dialog
+      setImportPreviewData({
+        gistTransactions,
+        localTransactions,
+        parsedData: parsed
+      })
+      setShowImportPreview(true)
+      setImporting(false)
+    } catch (e: any) {
+      alert('Import error: ' + e.message)
+      setImporting(false)
+    }
+  }
+
+  async function confirmImportFromGist(){
+    if (!importPreviewData) return
+    
+    try {
+      setImporting(true)
       
       // Preserve sensitive data before import
       const existingToken = await db.getMeta<string>('githubToken')
       const existingGistUrl = await db.getMeta<string>('gistUrl')
       
-      await db.importAll(parsed, { clearBefore: true })
+      await db.importAll(importPreviewData.parsedData, { clearBefore: true })
       
       // Restore sensitive data after import
       if (existingToken) {
@@ -348,7 +381,14 @@ export default function SettingsPage() {
       alert('Import error: ' + e.message)
     } finally {
       setImporting(false)
+      setShowImportPreview(false)
+      setImportPreviewData(null)
     }
+  }
+
+  function cancelImportFromGist(){
+    setShowImportPreview(false)
+    setImportPreviewData(null)
   }
 
   return (
@@ -670,6 +710,161 @@ export default function SettingsPage() {
             <li>Fast and reliable GitHub infrastructure</li>
           </ul>
         </div>
+
+        {showImportPreview && importPreviewData && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16
+          }}>
+            <div style={{
+              background: 'var(--bg)',
+              borderRadius: 12,
+              maxWidth: 800,
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              padding: 24,
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+            }}>
+              <h3 style={{marginTop: 0, marginBottom: 20, fontSize: '1.25rem'}}>
+                ⚠️ Review Before Importing
+              </h3>
+              
+              <div style={{
+                background: '#fef3c7',
+                border: '1px solid #f59e0b',
+                borderRadius: 8,
+                padding: 12,
+                marginBottom: 20,
+                fontSize: '0.875rem'
+              }}>
+                <strong>⚠️ Warning:</strong> This will erase all current data and import from GitHub Gist. Review the transaction list below to confirm.
+              </div>
+
+              <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20}}>
+                <div>
+                  <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '0.95rem', borderBottom: '2px solid var(--border)', paddingBottom: 8}}>
+                    📥 From GitHub Gist (Last 5)
+                  </h4>
+                  <div style={{fontSize: '0.875rem'}}>
+                    {importPreviewData.gistTransactions.length === 0 ? (
+                      <div style={{color: 'var(--text-secondary)', textAlign: 'center', padding: '16px 0'}}>
+                        No transactions found
+                      </div>
+                    ) : (
+                      importPreviewData.gistTransactions.map((tx: any, idx: number) => (
+                        <div key={idx} style={{
+                          padding: 8,
+                          marginBottom: 8,
+                          background: 'var(--accent-light)',
+                          borderRadius: 4,
+                          borderLeft: '3px solid #3b82f6'
+                        }}>
+                          <div style={{fontWeight: 500, color: 'var(--text)'}}>
+                            {tx.description || '(No description)'}
+                          </div>
+                          <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4}}>
+                            📅 {new Date(tx.date).toLocaleDateString()}
+                          </div>
+                          {tx.lines && tx.lines.length > 0 && (
+                            <div style={{fontSize: '0.8rem', marginTop: 4}}>
+                              {tx.lines.map((line: any, lineIdx: number) => (
+                                <div key={lineIdx} style={{color: line.amount > 0 ? '#10b981' : '#ef4444'}}>
+                                  {line.amount > 0 ? '+' : ''}{line.amount}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{marginTop: 0, marginBottom: 12, fontSize: '0.95rem', borderBottom: '2px solid var(--border)', paddingBottom: 8}}>
+                    💾 Current Local DB (Last 5)
+                  </h4>
+                  <div style={{fontSize: '0.875rem'}}>
+                    {importPreviewData.localTransactions.length === 0 ? (
+                      <div style={{color: 'var(--text-secondary)', textAlign: 'center', padding: '16px 0'}}>
+                        No transactions found
+                      </div>
+                    ) : (
+                      importPreviewData.localTransactions.map((tx: any, idx: number) => (
+                        <div key={idx} style={{
+                          padding: 8,
+                          marginBottom: 8,
+                          background: 'var(--accent-light)',
+                          borderRadius: 4,
+                          borderLeft: '3px solid #8b5cf6'
+                        }}>
+                          <div style={{fontWeight: 500, color: 'var(--text)'}}>
+                            {tx.description || '(No description)'}
+                          </div>
+                          <div style={{fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 4}}>
+                            📅 {new Date(tx.date).toLocaleDateString()}
+                          </div>
+                          {tx.lines && tx.lines.length > 0 && (
+                            <div style={{fontSize: '0.8rem', marginTop: 4}}>
+                              {tx.lines.map((line: any, lineIdx: number) => (
+                                <div key={lineIdx} style={{color: line.amount > 0 ? '#10b981' : '#ef4444'}}>
+                                  {line.amount > 0 ? '+' : ''}{line.amount}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{display: 'flex', gap: 12, justifyContent: 'flex-end'}}>
+                <button 
+                  onClick={cancelImportFromGist}
+                  style={{
+                    padding: '10px 20px',
+                    background: '#e5e7eb',
+                    border: '1px solid #d1d5db',
+                    borderRadius: 6,
+                    cursor: 'pointer',
+                    color: '#374151',
+                    fontWeight: 500
+                  }}
+                >
+                  ❌ Cancel
+                </button>
+                <button 
+                  onClick={confirmImportFromGist}
+                  disabled={importing}
+                  style={{
+                    padding: '10px 20px',
+                    background: importing ? '#9ca3af' : '#ef4444',
+                    border: 'none',
+                    borderRadius: 6,
+                    cursor: importing ? 'not-allowed' : 'pointer',
+                    color: 'white',
+                    fontWeight: 500,
+                    opacity: importing ? 0.6 : 1
+                  }}
+                >
+                  {importing ? '⏳ Importing...' : '⚠️ Continue Import'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
         </>
       )}
