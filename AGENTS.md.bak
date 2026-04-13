@@ -1,0 +1,71 @@
+You are an expert full-stack developer and UI/UX designer. Your task is to build a modern, offline-first Web Application (PWA) that functions as an advanced Expense Tracker. 
+
+Please generate the necessary code, file structures, and implementation steps based on the requirements below.
+
+### 1. Technology Stack
+* **Framework:** React (using Vite for fast building) or Next.js (Static Export).
+* **Styling:** Tailwind CSS + a component library like shadcn/ui or Radix for clean, modern UI.
+* **Database:** IndexedDB (Use a wrapper like `Dexie.js` for easier asynchronous querying and schema management).
+* **PWA:** `vite-plugin-pwa` (or equivalent) to generate the manifest and service workers for complete offline functionality.
+* **State Management:** Zustand or React Context for global state.
+
+### 2. Core Architecture & Requirements
+* **Offline-First:** The app must work 100% offline. Read and write operations go directly to IndexedDB. 
+* **PWA Ready:** Must include a manifest file and service worker so it can be installed on mobile/desktop and cache static assets.
+* **Cloud Backup:** Data can be exported/imported as JSON via GitHub Gists to allow users to sync across devices without a dedicated backend.
+
+### 3. Database Schema (IndexedDB via Dexie.js)
+Please define the following tables/collections:
+* `accounts`: id, name (e.g., "Cash", "Main Bank", "Credit Card"), type, initialBalance, createdAt.
+* `transactions`: id, accountId, type (income, expense, transfer), amount, date, description, tags (array of strings), isCommitted (boolean), toAccountId (optional, for transfers), transferFee (optional), createdAt.
+* `budgets`: id, name, targetTags (array of tags), limitAmount, period (e.g., monthly).
+* `recurring`: id, templateTransaction (object), frequency (daily, weekly, monthly), nextOccurrence, isActive.
+* `settings`: key, value (used to store user preferences like GitHub PAT and Gist ID).
+
+### 4. Feature Specifications
+
+* **Multi-Account Support:** * Users can create multiple accounts.
+    * The total net worth should be a computed sum of all accounts.
+
+* **Account Transfers:**
+    * Users can move money between their accounts (e.g., Bank to Cash).
+    * A transfer should be treated logically in the database (either as a specific 'transfer' type with a `toAccountId`, or creating two linked transactions: an expense from the source and income to the destination).
+    * Support adding an optional "Transfer Fee" (which acts as a standard expense on the source account).
+
+* **Dashboard (High-Level Overview):**
+    * Total net worth (sum of all accounts).
+    * Current month's expenses vs. income (excluding transfers so it doesn't inflate cash flow).
+    * Budget progress bars (Amount spent vs. Budget limit based on tagged transactions).
+    * Recent transactions list.
+
+* **Budget Feature:**
+    * Users can set a budget limit for specific tags (e.g., $300 for "Food" and "Groceries").
+    * Visual indicators (green/yellow/red) when approaching or exceeding the budget.
+
+* **Transaction Tagging:**
+    * Every transaction (income, expense, or transfer) can have multiple tags.
+    * Include a filtering system on the transaction history page to sort by date, account, and tags.
+
+* **Recurring Transactions:**
+    * A chron-job-like logic that evaluates on app load. If a recurring transaction's `nextOccurrence` date is in the past, auto-generate the transaction and update the `nextOccurrence` date to the next cycle.
+
+* **"Commit" Style Input (Staging Area):**
+    * Implement a "Draft" or "Staging" UI mechanic for incomes, expenses, AND transfers.
+    * When a user inputs a record, it goes into a "pending" or "staged" list rather than immediately updating the account balance.
+    * The user can queue up multiple entries (e.g., batching receipts and transfers at the end of the day) and then hit a "Commit Changes" button to finalize them all at once into the database. 
+    * *Bonus UI idea:* A terminal-like text input for rapid entry (e.g., `-50 Groceries #food @Cash` or `>100 @Bank to @Cash #atm`) that stages the transaction.
+
+* **Data Sync via GitHub Gist (Export/Import):**
+    * A settings page where the user can input a GitHub Personal Access Token (PAT) and a Gist ID.
+    * **Export:** A function that serializes the entire Dexie DB (accounts, transactions, budgets, recurring) into a single JSON payload and updates the specified GitHub Gist via the GitHub REST API.
+    * **Import:** A function that fetches the JSON from the Gist, clears the current Dexie DB, and repopulates it with the fetched data. Provide a warning UI before overwriting local data.
+
+### 5. Execution Steps
+Please provide the response in the following phases:
+1.  **Project Setup:** The terminal commands to initialize the project and install dependencies.
+2.  **Database & Types:** The Dexie.js setup file, TypeScript interfaces, and the Gist Sync utility functions.
+3.  **State & Hooks:** Custom hooks for interacting with the database (e.g., `useAccounts`, `useTransactions`).
+4.  **Core Components:** Code for the Dashboard, the Commit-Style Input form, Transfer Logic, and the Budget tracker.
+5.  **PWA Configuration:** How to set up the service worker and manifest.
+
+Let's start with Phase 1 and Phase 2.
