@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
-import { TrendingUp, TrendingDown, ArrowRight as Transfer, Loader2, AlertTriangle, CloudDownload, HardDrive } from 'lucide-react'
+import {
+  TrendingUp, TrendingDown, ArrowRight as Transfer,
+  Loader2, AlertTriangle, CloudDownload, CloudUpload, HardDrive,
+} from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { importFromGist } from '@/utils/gistSync'
@@ -8,21 +11,35 @@ import type { GistSyncPayload, Transaction } from '@/db/types'
 import { formatCurrency, formatDateShort, formatDate } from '@/lib/utils'
 import { useSettings } from '@/hooks/useSettings'
 
-interface Props {
-  open: boolean
-  pat: string
-  gistId: string
-  onConfirm: (payload: GistSyncPayload) => void
-  onCancel: () => void
-}
-
 type LoadState = 'loading' | 'ready' | 'error'
 
-// ─── Mini transaction row (shared by both columns) ────────────────────────────
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
+/** Sort committed transactions newest-first and return the top N. */
+function topCommitted(txs: Transaction[], n = 3): Transaction[] {
+  return [...txs]
+    .filter((tx) => tx.isCommitted)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, n)
+}
+
+/** Fetch local DB snapshot: recent txs, tx count, account count. */
+async function fetchLocalSnapshot() {
+  const [allTxs, accountCount] = await Promise.all([
+    db.transactions.toArray(),
+    db.accounts.count(),
+  ])
+  const committed = allTxs.filter((tx) => tx.isCommitted)
+  const recentTxs = [...committed]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 3)
+  return { recentTxs, txCount: committed.length, accountCount }
+}
+
+// ─── Mini transaction row ─────────────────────────────────────────────────────
 function TxRow({ tx, currency }: { tx: Transaction; currency: string }) {
   const isIncome = tx.type === 'income'
   const isExpense = tx.type === 'expense'
-
   return (
     <div className="flex items-center gap-2 py-2">
       <div className={`p-1.5 rounded-md shrink-0 ${
@@ -50,16 +67,9 @@ function TxRow({ tx, currency }: { tx: Transaction; currency: string }) {
   )
 }
 
-// ─── One side of the comparison panel ────────────────────────────────────────
+// ─── Comparison column ────────────────────────────────────────────────────────
 function PreviewColumn({
-  label,
-  icon,
-  exportedAt,
-  txCount,
-  accountCount,
-  recentTxs,
-  currency,
-  highlight,
+  label, icon, exportedAt, txCount, accountCount, recentTxs, currency, highlight,
 }: {
   label: string
   icon: React.ReactNode
@@ -74,19 +84,13 @@ function PreviewColumn({
     <div className={`flex-1 min-w-0 rounded-lg border p-3 space-y-3 ${
       highlight ? 'border-violet-500/40 bg-violet-500/5' : 'border-border bg-card/50'
     }`}>
-      {/* Header */}
       <div className="flex items-center gap-2">
-        <span className={`${highlight ? 'text-violet-400' : 'text-muted-foreground'}`}>
-          {icon}
-        </span>
+        <span className={highlight ? 'text-violet-400' : 'text-muted-foreground'}>{icon}</span>
         <span className={`text-xs font-semibold uppercase tracking-wide ${
           highlight ? 'text-violet-400' : 'text-muted-foreground'
-        }`}>
-          {label}
-        </span>
+        }`}>{label}</span>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 gap-1.5">
         <div className="rounded-md bg-secondary/50 px-2 py-1.5 text-center">
           <p className="text-lg font-bold leading-none">{accountCount}</p>
@@ -98,16 +102,16 @@ function PreviewColumn({
         </div>
       </div>
 
-      {/* Exported at */}
       {exportedAt && (
         <p className="text-xs text-muted-foreground">
           Saved: <span className="text-foreground">{formatDate(exportedAt)}</span>
         </p>
       )}
 
-      {/* Recent transactions */}
       <div>
-        <p className="text-xs text-muted-foreground mb-1">Last {recentTxs.length} transaction{recentTxs.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-muted-foreground mb-1">
+          Last {recentTxs.length} transaction{recentTxs.length !== 1 ? 's' : ''}
+        </p>
         {recentTxs.length === 0 ? (
           <p className="text-xs text-muted-foreground italic py-2">No transactions</p>
         ) : (
@@ -122,8 +126,39 @@ function PreviewColumn({
   )
 }
 
-// ─── Main dialog ──────────────────────────────────────────────────────────────
-export function ImportPreviewDialog({ open, pat, gistId, onConfirm, onCancel }: Props) {
+// ─── Inline error banner ──────────────────────────────────────────────────────
+function ErrorBanner({ message }: { message: string }) {
+  return (
+    <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+      {message}
+    </div>
+  )
+}
+
+// ─── Loading state ────────────────────────────────────────────────────────────
+function LoadingState({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
+      <Loader2 className="h-5 w-5 animate-spin" />
+      <span className="text-sm">{label}</span>
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ImportPreviewDialog
+// Shows remote Gist vs local DB before overwriting local with the Gist.
+// ═════════════════════════════════════════════════════════════════════════════
+
+interface ImportPreviewProps {
+  open: boolean
+  pat: string
+  gistId: string
+  onConfirm: (payload: GistSyncPayload) => void
+  onCancel: () => void
+}
+
+export function ImportPreviewDialog({ open, pat, gistId, onConfirm, onCancel }: ImportPreviewProps) {
   const { currency } = useSettings()
   const [state, setState] = useState<LoadState>('loading')
   const [errorMsg, setErrorMsg] = useState('')
@@ -132,43 +167,24 @@ export function ImportPreviewDialog({ open, pat, gistId, onConfirm, onCancel }: 
   const [localAccountCount, setLocalAccountCount] = useState(0)
   const [localTxCount, setLocalTxCount] = useState(0)
 
-  // Fetch remote payload + local snapshot whenever dialog opens
   useEffect(() => {
     if (!open) return
     setState('loading')
     setErrorMsg('')
     setRemotePayload(null)
 
-    Promise.all([
-      importFromGist(pat, gistId),
-      db.transactions.where('isCommitted').equals(1).sortBy('date'),
-      db.transactions.where('isCommitted').equals(1).count(),
-      db.accounts.count(),
-    ])
-      .then(([payload, allLocalTxs, localCount, acctCount]) => {
+    Promise.all([importFromGist(pat, gistId), fetchLocalSnapshot()])
+      .then(([payload, local]) => {
         setRemotePayload(payload)
-        // Most recent 3 committed local transactions (newest first)
-        const sorted = [...allLocalTxs].sort(
-          (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-        )
-        setLocalTxs(sorted.slice(0, 3))
-        setLocalTxCount(localCount)
-        setLocalAccountCount(acctCount)
+        setLocalTxs(local.recentTxs)
+        setLocalTxCount(local.txCount)
+        setLocalAccountCount(local.accountCount)
         setState('ready')
       })
-      .catch((err: unknown) => {
-        setErrorMsg(String(err))
-        setState('error')
-      })
+      .catch((err: unknown) => { setErrorMsg(String(err)); setState('error') })
   }, [open, pat, gistId])
 
-  // Most recent 3 committed remote transactions (newest first)
-  const remoteTxs = remotePayload
-    ? [...remotePayload.transactions]
-        .filter((tx) => tx.isCommitted)
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .slice(0, 3)
-    : []
+  const remoteTxs = remotePayload ? topCommitted(remotePayload.transactions) : []
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
@@ -183,22 +199,9 @@ export function ImportPreviewDialog({ open, pat, gistId, onConfirm, onCancel }: 
           </DialogDescription>
         </DialogHeader>
 
-        {/* Loading */}
-        {state === 'loading' && (
-          <div className="flex items-center justify-center gap-2 py-12 text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Fetching Gist backup…</span>
-          </div>
-        )}
+        {state === 'loading' && <LoadingState label="Fetching Gist backup…" />}
+        {state === 'error'   && <ErrorBanner message={errorMsg} />}
 
-        {/* Error */}
-        {state === 'error' && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-            {errorMsg}
-          </div>
-        )}
-
-        {/* Ready — side-by-side comparison */}
         {state === 'ready' && remotePayload && (
           <div className="flex gap-3 flex-col sm:flex-row">
             <PreviewColumn
@@ -223,15 +226,139 @@ export function ImportPreviewDialog({ open, pat, gistId, onConfirm, onCancel }: 
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
           <Button
             variant="destructive"
             disabled={state !== 'ready'}
             onClick={() => remotePayload && onConfirm(remotePayload)}
           >
             Yes, overwrite with Gist
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// ExportPreviewDialog
+// Shows local DB vs remote Gist before overwriting the Gist with local data.
+// ═════════════════════════════════════════════════════════════════════════════
+
+interface ExportPreviewProps {
+  open: boolean
+  pat: string
+  gistId: string
+  onConfirm: () => void
+  onCancel: () => void
+}
+
+export function ExportPreviewDialog({ open, pat, gistId, onConfirm, onCancel }: ExportPreviewProps) {
+  const { currency } = useSettings()
+  const [state, setState] = useState<LoadState>('loading')
+  const [errorMsg, setErrorMsg] = useState('')
+  const [remotePayload, setRemotePayload] = useState<GistSyncPayload | null>(null)
+  const [localTxs, setLocalTxs] = useState<Transaction[]>([])
+  const [localAccountCount, setLocalAccountCount] = useState(0)
+  const [localTxCount, setLocalTxCount] = useState(0)
+
+  useEffect(() => {
+    if (!open) return
+    setState('loading')
+    setErrorMsg('')
+    setRemotePayload(null)
+
+    Promise.all([importFromGist(pat, gistId), fetchLocalSnapshot()])
+      .then(([payload, local]) => {
+        setRemotePayload(payload)
+        setLocalTxs(local.recentTxs)
+        setLocalTxCount(local.txCount)
+        setLocalAccountCount(local.accountCount)
+        setState('ready')
+      })
+      .catch((err: unknown) => {
+        // If the Gist has never been properly exported (placeholder), treat it
+        // as an empty remote rather than blocking the export entirely.
+        const msg = String(err)
+        const isVersionMismatch = msg.includes('Incompatible backup version')
+        const isNotFound = msg.includes('not found in the Gist')
+        if (isVersionMismatch || isNotFound) {
+          setRemotePayload(null)
+          fetchLocalSnapshot()
+            .then((local) => {
+              setLocalTxs(local.recentTxs)
+              setLocalTxCount(local.txCount)
+              setLocalAccountCount(local.accountCount)
+              setState('ready')
+            })
+            .catch((e: unknown) => { setErrorMsg(String(e)); setState('error') })
+        } else {
+          setErrorMsg(msg)
+          setState('error')
+        }
+      })
+  }, [open, pat, gistId])
+
+  const remoteTxs = remotePayload ? topCommitted(remotePayload.transactions) : []
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onCancel() }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-yellow-400" />
+            Review before exporting
+          </DialogTitle>
+          <DialogDescription>
+            Your local data will overwrite the existing Gist backup. The current Gist content will be lost.
+          </DialogDescription>
+        </DialogHeader>
+
+        {state === 'loading' && <LoadingState label="Fetching current Gist backup…" />}
+        {state === 'error'   && <ErrorBanner message={errorMsg} />}
+
+        {state === 'ready' && (
+          <div className="flex gap-3 flex-col sm:flex-row">
+            {/* Remote — what will be overwritten */}
+            {remotePayload ? (
+              <PreviewColumn
+                label="Gist (will be overwritten)"
+                icon={<CloudDownload className="h-3.5 w-3.5" />}
+                exportedAt={remotePayload.exportedAt}
+                txCount={remotePayload.transactions.filter((tx) => tx.isCommitted).length}
+                accountCount={remotePayload.accounts.length}
+                recentTxs={remoteTxs}
+                currency={currency}
+              />
+            ) : (
+              /* Gist had a placeholder / no valid backup yet */
+              <div className="flex-1 min-w-0 rounded-lg border border-border bg-card/50 p-3 flex flex-col items-center justify-center gap-2 text-muted-foreground min-h-[120px]">
+                <CloudDownload className="h-6 w-6 opacity-40" />
+                <p className="text-xs text-center">No existing backup in Gist</p>
+              </div>
+            )}
+
+            {/* Local — what will replace it */}
+            <PreviewColumn
+              label="Local (will replace)"
+              icon={<CloudUpload className="h-3.5 w-3.5" />}
+              txCount={localTxCount}
+              accountCount={localAccountCount}
+              recentTxs={localTxs}
+              currency={currency}
+              highlight
+            />
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onCancel}>Cancel</Button>
+          <Button
+            variant="destructive"
+            disabled={state !== 'ready'}
+            onClick={onConfirm}
+          >
+            Yes, overwrite Gist
           </Button>
         </DialogFooter>
       </DialogContent>

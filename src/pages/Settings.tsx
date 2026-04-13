@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useSettings } from '@/hooks/useSettings'
 import { exportToGist, restoreFromPayload, createNewGist } from '@/utils/gistSync'
-import { ImportPreviewDialog } from '@/components/staging/ImportPreviewDialog'
+import { ImportPreviewDialog, ExportPreviewDialog } from '@/components/staging/ImportPreviewDialog'
 import type { GistSyncPayload } from '@/db/types'
 import { formatDate, cn } from '@/lib/utils'
 import { db } from '@/db/db'
@@ -170,6 +170,7 @@ export default function Settings() {
   const [curr, setCurr] = useState(currency)
   const [exportStatus, setExportStatus] = useState<SyncStatus>('idle')
   const [importStatus, setImportStatus] = useState<SyncStatus>('idle')
+  const [showExportPreview, setShowExportPreview] = useState(false)
   const [showImportPreview, setShowImportPreview] = useState(false)
 
   // Sync local state once DB values are loaded (useLiveQuery resolves async)
@@ -210,6 +211,13 @@ export default function Settings() {
       toast.warning('Missing credentials', 'Enter your GitHub PAT and Gist ID first.')
       return
     }
+    setShowExportPreview(true)
+  }
+
+  async function handleConfirmExport() {
+    setShowExportPreview(false)
+    const activePat = pat || githubPat
+    const activeGist = gist || gistId
     try {
       setExportStatus('loading')
       await exportToGist(activePat, activeGist)
@@ -395,6 +403,15 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+
+      {/* Export preview dialog */}
+      <ExportPreviewDialog
+        open={showExportPreview}
+        pat={pat || githubPat}
+        gistId={gist || gistId}
+        onConfirm={handleConfirmExport}
+        onCancel={() => setShowExportPreview(false)}
+      />
 
       {/* Import preview dialog */}
       <ImportPreviewDialog
