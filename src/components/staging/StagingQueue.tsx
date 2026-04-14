@@ -197,8 +197,12 @@ export function CommitButton() {
   if (count === 0) return null
 
   async function handleCommit() {
-    const n = await commitAll()
-    toast.success('Committed!', `${n} transaction${n === 1 ? '' : 's'} saved to your records.`)
+    try {
+      const n = await commitAll()
+      toast.success('Committed!', `${n} transaction${n === 1 ? '' : 's'} saved to your records.`)
+    } catch (err) {
+      toast.error('Commit failed', String(err))
+    }
   }
 
   function handleDiscard() {

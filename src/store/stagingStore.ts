@@ -54,13 +54,24 @@ export const useStagingStore = create<StagingStore>((set, get) => ({
     if (staged.length === 0) return 0
 
     const now = new Date().toISOString()
-    const records = staged.map(({ id: _id, ...tx }) => ({
-      ...tx,
-      isCommitted: true,
-      createdAt: now,
-    }))
+    const records = staged.map(({ id: _id, ...tx }) => {
+      // Strip undefined optional fields so IndexedDB doesn't choke on them
+      const record: Record<string, unknown> = {
+        accountId: tx.accountId,
+        type: tx.type,
+        amount: tx.amount,
+        date: tx.date,
+        description: tx.description,
+        tags: tx.tags,
+        isCommitted: true,
+        createdAt: now,
+      }
+      if (tx.toAccountId !== undefined) record.toAccountId = tx.toAccountId
+      if (tx.transferFee !== undefined) record.transferFee = tx.transferFee
+      return record
+    })
 
-    await db.transactions.bulkAdd(records)
+    await db.transactions.bulkAdd(records as unknown as Parameters<typeof db.transactions.bulkAdd>[0])
     set({ staged: [], isOpen: false })
     return records.length
   },
