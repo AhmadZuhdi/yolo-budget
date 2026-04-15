@@ -1,19 +1,20 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, ArrowLeftRight, Wallet, Target, Settings } from 'lucide-react'
+import { LayoutDashboard, ArrowLeftRight, Wallet, Target, RefreshCw, Settings } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { to: '/',             label: 'Home',    icon: LayoutDashboard },
-  { to: '/transactions', label: 'History', icon: ArrowLeftRight },
-  { to: '/accounts',     label: 'Accounts',icon: Wallet },
-  { to: '/budgets',      label: 'Budgets', icon: Target },
-  { to: '/settings',     label: 'Settings',icon: Settings },
+  { to: '/',             label: 'Home',      icon: LayoutDashboard },
+  { to: '/transactions', label: 'History',   icon: ArrowLeftRight },
+  { to: '/accounts',     label: 'Accounts',  icon: Wallet },
+  { to: '/budgets',      label: 'Budgets',   icon: Target },
+  { to: '/recurring',    label: 'Recurring', icon: RefreshCw },
+  { to: '/settings',     label: 'Settings',  icon: Settings },
 ]
 
 export function BottomNav() {
   return (
     <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-card border-t border-border pb-safe">
-      <div className="flex items-stretch">
+      <div className="flex overflow-x-auto scrollbar-none">
         {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -21,7 +22,7 @@ export function BottomNav() {
             end={to === '/'}
             className={({ isActive }) =>
               cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[10px] font-medium transition-colors min-h-[56px]',
+                'flex shrink-0 flex-col items-center justify-center gap-1 px-3 py-2 text-[10px] font-medium transition-colors min-h-[56px] min-w-[64px]',
                 isActive ? 'text-primary' : 'text-muted-foreground'
               )
             }

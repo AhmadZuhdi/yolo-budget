@@ -97,8 +97,17 @@
   }
 }
 
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer components {
-  /* Card variants */
   .card-glass {
     @apply bg-card/80 backdrop-blur-sm border border-border rounded-xl;
   }
