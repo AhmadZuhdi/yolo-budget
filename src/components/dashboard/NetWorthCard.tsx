@@ -1,24 +1,37 @@
-import { TrendingUp, TrendingDown, Wallet } from 'lucide-react'
+import { TrendingUp, TrendingDown, Wallet, Eye, EyeOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency } from '@/lib/utils'
+import { useStagingStore } from '@/store/stagingStore'
+
+const MASK = '••••••'
 
 export function NetWorthCard() {
   const { netWorth, accountsWithBalance } = useAccounts()
   const { currency } = useSettings()
+  const { hideAmounts, toggleHideAmounts } = useStagingStore()
 
   return (
     <Card className="bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
       <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 text-muted-foreground text-sm font-medium">
-          <Wallet className="h-4 w-4" />
-          Total Net Worth
+        <CardTitle className="flex items-center justify-between text-muted-foreground text-sm font-medium">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4" />
+            Total Net Worth
+          </div>
+          <button
+            onClick={toggleHideAmounts}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={hideAmounts ? 'Show amounts' : 'Hide amounts'}
+          >
+            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <p className="text-3xl font-bold text-foreground tracking-tight">
-          {formatCurrency(netWorth, currency)}
+          {hideAmounts ? MASK : formatCurrency(netWorth, currency)}
         </p>
 
         {accountsWithBalance.length > 0 && (
@@ -33,7 +46,7 @@ export function NetWorthCard() {
                   <span className="text-muted-foreground truncate max-w-[120px]">{acc.name}</span>
                 </div>
                 <span className={acc.balance < 0 ? 'text-red-400' : 'text-foreground'}>
-                  {formatCurrency(acc.balance, currency)}
+                  {hideAmounts ? MASK : formatCurrency(acc.balance, currency)}
                 </span>
               </div>
             ))}

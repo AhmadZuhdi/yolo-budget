@@ -6,11 +6,15 @@ import { useTransactions } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
+import { useStagingStore } from '@/store/stagingStore'
+
+const MASK = '••••••'
 
 export function RecentTransactions() {
   const { transactions } = useTransactions({ committedOnly: true })
   const { accounts } = useAccounts()
   const { currency } = useSettings()
+  const { hideAmounts } = useStagingStore()
 
   const recent = transactions.slice(0, 8)
 
@@ -69,8 +73,12 @@ export function RecentTransactions() {
                     tx.type === 'expense'  ? 'text-red-400' :
                                              'text-blue-400'
                   }`}>
-                    {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
-                    {formatCurrency(tx.amount, currency)}
+                    {hideAmounts ? MASK : (
+                      <>
+                        {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
+                        {formatCurrency(tx.amount, currency)}
+                      </>
+                    )}
                   </span>
                 </div>
               )

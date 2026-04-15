@@ -8,10 +8,14 @@ import { useBudgets } from '@/hooks/useBudgets'
 import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { useStagingStore } from '@/store/stagingStore'
+
+const MASK = '••••••'
 
 function CashFlowCard() {
   const { monthlyFlow } = useTransactions()
   const { currency } = useSettings()
+  const { hideAmounts } = useStagingStore()
   return (
     <Card>
       <CardHeader className="pb-2">
@@ -24,7 +28,7 @@ function CashFlowCard() {
             <span className="text-xs">Income</span>
           </div>
           <span className="text-xl font-semibold text-emerald-400">
-            {formatCurrency(monthlyFlow.income, currency)}
+            {hideAmounts ? MASK : formatCurrency(monthlyFlow.income, currency)}
           </span>
         </div>
         <div className="flex flex-col gap-1">
@@ -33,7 +37,7 @@ function CashFlowCard() {
             <span className="text-xs">Expenses</span>
           </div>
           <span className="text-xl font-semibold text-red-400">
-            {formatCurrency(monthlyFlow.expense, currency)}
+            {hideAmounts ? MASK : formatCurrency(monthlyFlow.expense, currency)}
           </span>
         </div>
       </CardContent>
@@ -44,6 +48,7 @@ function CashFlowCard() {
 function BudgetOverview() {
   const { budgets } = useBudgets()
   const { currency } = useSettings()
+  const { hideAmounts } = useStagingStore()
   if (budgets.length === 0) return null
 
   return (
@@ -62,7 +67,7 @@ function BudgetOverview() {
                 b.status === 'warning' && 'text-yellow-400',
                 b.status === 'danger'  && 'text-red-400',
               )}>
-                {formatCurrency(b.spent, currency)} / {formatCurrency(b.limitAmount, currency)}
+                {hideAmounts ? MASK : `${formatCurrency(b.spent, currency)} / ${formatCurrency(b.limitAmount, currency)}`}
               </span>
             </div>
             <Progress

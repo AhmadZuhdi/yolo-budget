@@ -9,11 +9,13 @@ function uuid(): string {
 interface StagingStore {
   staged: StagedTransaction[]
   isOpen: boolean
+  hideAmounts: boolean
 
   // Sheet open/close
   openSheet: () => void
   closeSheet: () => void
   toggleSheet: () => void
+  toggleHideAmounts: () => void
 
   // Staging operations
   addToStaging: (tx: Omit<StagedTransaction, 'id'>) => void
@@ -28,10 +30,12 @@ interface StagingStore {
 export const useStagingStore = create<StagingStore>((set, get) => ({
   staged: [],
   isOpen: false,
+  hideAmounts: true,
 
   openSheet: () => set({ isOpen: true }),
   closeSheet: () => set({ isOpen: false }),
   toggleSheet: () => set((s) => ({ isOpen: !s.isOpen })),
+  toggleHideAmounts: () => set((s) => ({ hideAmounts: !s.hideAmounts })),
 
   addToStaging: (tx) =>
     set((s) => ({
