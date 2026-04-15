@@ -13,13 +13,20 @@ import { useStagingStore } from '@/store/stagingStore'
 const MASK = '••••••'
 
 function CashFlowCard() {
-  const { monthlyFlow } = useTransactions()
-  const { currency } = useSettings()
+  const { currency, paycycleDay } = useSettings()
+  const { paycycleFlow } = useTransactions({}, paycycleDay)
   const { hideAmounts } = useStagingStore()
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">This Month</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          Pay Cycle
+          {paycycleFlow.start && (
+            <span className="ml-2 font-normal text-xs">
+              {paycycleFlow.start} → {paycycleFlow.end}
+            </span>
+          )}
+        </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
@@ -28,7 +35,7 @@ function CashFlowCard() {
             <span className="text-xs">Income</span>
           </div>
           <span className="text-xl font-semibold text-emerald-400">
-            {hideAmounts ? MASK : formatCurrency(monthlyFlow.income, currency)}
+            {hideAmounts ? MASK : formatCurrency(paycycleFlow.income, currency)}
           </span>
         </div>
         <div className="flex flex-col gap-1">
@@ -37,7 +44,7 @@ function CashFlowCard() {
             <span className="text-xs">Expenses</span>
           </div>
           <span className="text-xl font-semibold text-red-400">
-            {hideAmounts ? MASK : formatCurrency(monthlyFlow.expense, currency)}
+            {hideAmounts ? MASK : formatCurrency(paycycleFlow.expense, currency)}
           </span>
         </div>
       </CardContent>

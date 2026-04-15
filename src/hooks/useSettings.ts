@@ -31,5 +31,6 @@ export function useSettings() {
     gistId: settingsMap.gistId ?? '',
     currency: settingsMap.currency ?? 'USD',
     lastSyncAt: settingsMap.lastSyncAt,
+    paycycleDay: settingsMap.paycycleDay ? parseInt(settingsMap.paycycleDay, 10) : 25,
   }
 }

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTransactions, TransactionFilters } from '@/hooks/useTransactions'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, getPaycycleDateRange } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { ReconcileDialog } from '@/components/transactions/ReconcileDialog'
 import { EditTransactionDialog } from '@/components/transactions/EditTransactionDialog'
@@ -21,10 +21,11 @@ export default function Transactions() {
   const [showReconcile, setShowReconcile] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [payCycleActive, setPayCycleActive] = useState(false)
 
   const { transactions, allTags, deleteTransaction } = useTransactions({ ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined })
   const { accounts } = useAccounts()
-  const { currency } = useSettings()
+  const { currency, paycycleDay } = useSettings()
 
   function getAccount(id: number) {
     return accounts.find((a) => a.id === id)
@@ -34,6 +35,17 @@ export default function Transactions() {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     )
+  }
+
+  function togglePayCycle() {
+    if (payCycleActive) {
+      setPayCycleActive(false)
+      setFilters((f) => ({ ...f, startDate: undefined, endDate: undefined }))
+    } else {
+      const { start, end } = getPaycycleDateRange(paycycleDay)
+      setPayCycleActive(true)
+      setFilters((f) => ({ ...f, startDate: start, endDate: end }))
+    }
   }
 
   async function handleDelete(tx: Transaction) {
@@ -78,6 +90,14 @@ export default function Transactions() {
           <Button
             variant="outline"
             size="sm"
+            onClick={togglePayCycle}
+            className={cn(payCycleActive && 'border-primary text-primary bg-primary/10')}
+          >
+            Pay Cycle
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowFilters((s) => !s)}
             className={cn(showFilters && 'border-primary text-primary')}
           >
@@ -86,6 +106,16 @@ export default function Transactions() {
           </Button>
         </div>
       </div>
+
+      {payCycleActive && (
+        <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
+          <span className="font-medium">Pay Cycle:</span>
+          <span>{filters.startDate} → {filters.endDate}</span>
+          <button onClick={togglePayCycle} className="ml-auto hover:text-foreground transition-colors">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
 
       <ReconcileDialog open={showReconcile} onOpenChange={setShowReconcile} />
 
@@ -194,7 +224,7 @@ export default function Transactions() {
                 variant="ghost"
                 size="sm"
                 className="w-full text-xs text-muted-foreground"
-                onClick={() => { setFilters({ committedOnly: true }); setSelectedTags([]) }}
+                onClick={() => { setFilters({ committedOnly: true }); setSelectedTags([]); setPayCycleActive(false) }}
               >
                 <X className="h-3 w-3 mr-1" /> Clear filters
               </Button>

@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/db'
 import type { Transaction } from '@/db/types'
 import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
+import { getPaycycleDateRange } from '@/lib/utils'
 
 export interface TransactionFilters {
   accountId?: number
@@ -12,7 +13,7 @@ export interface TransactionFilters {
   committedOnly?: boolean
 }
 
-export function useTransactions(filters: TransactionFilters = {}) {
+export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 25) {
   const transactions = useLiveQuery(async () => {
     let query = db.transactions.orderBy('date').reverse()
 
@@ -75,6 +76,28 @@ export function useTransactions(filters: TransactionFilters = {}) {
     return { income, expense, net: income - expense }
   }, [])
 
+  // Pay-cycle cash flow (based on configured payday, excludes transfers)
+  const paycycleFlow = useLiveQuery(async () => {
+    const { start, end } = getPaycycleDateRange(paycycleDay)
+
+    const txs = await db.transactions
+      .where('date')
+      .between(start, end, true, true)
+      .and((tx) => tx.isCommitted && tx.type !== 'transfer')
+      .toArray()
+
+    const income = txs
+      .filter((tx) => tx.type === 'income')
+      .reduce((s, tx) => s + tx.amount, 0)
+
+    const expense = txs
+      .filter((tx) => tx.type === 'expense')
+      .reduce((s, tx) => s + tx.amount, 0)
+
+    const { start: cycleStart, end: cycleEnd } = getPaycycleDateRange(paycycleDay)
+    return { income, expense, net: income - expense, start: cycleStart, end: cycleEnd }
+  }, [paycycleDay])
+
   async function addTransaction(data: Omit<Transaction, 'id' | 'createdAt'>) {
     return db.transactions.add({ ...data, createdAt: new Date().toISOString() })
   }
@@ -102,6 +125,7 @@ export function useTransactions(filters: TransactionFilters = {}) {
   return {
     transactions: transactions ?? [],
     monthlyFlow: monthlyFlow ?? { income: 0, expense: 0, net: 0 },
+    paycycleFlow: paycycleFlow ?? { income: 0, expense: 0, net: 0, start: '', end: '' },
     allTags: allTags ?? [],
     addTransaction,
     updateTransaction,

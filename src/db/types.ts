@@ -82,6 +82,7 @@ export type SettingKey =
   | 'currency'
   | 'theme'
   | 'lastSyncAt'
+  | 'paycycleDay'
 
 export interface Setting {
   key: SettingKey

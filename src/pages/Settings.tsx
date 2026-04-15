@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Settings as SettingsIcon, Github, Upload, Download, Check, Loader2, Trash2, ChevronDown, Search, Info } from 'lucide-react'
+import { Settings as SettingsIcon, Github, Upload, Download, Check, Loader2, Trash2, ChevronDown, Search, Info, CalendarDays } from 'lucide-react'
 import pkg from '../../package.json'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { exportToGist, restoreFromPayload, createNewGist } from '@/utils/gistSync'
 import { ImportPreviewDialog, ExportPreviewDialog } from '@/components/staging/ImportPreviewDialog'
 import type { GistSyncPayload } from '@/db/types'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate, getPaycycleDateRange, cn } from '@/lib/utils'
 import { db } from '@/db/db'
 import { toast } from '@/hooks/useToast'
 
@@ -164,10 +164,11 @@ function CurrencySelect({ value, onChange }: { value: string; onChange: (v: stri
 type SyncStatus = 'idle' | 'loading' | 'success' | 'error'
 
 export default function Settings() {
-  const { setSetting, githubPat, gistId, currency, lastSyncAt } = useSettings()
+  const { setSetting, githubPat, gistId, currency, lastSyncAt, paycycleDay } = useSettings()
   const [pat, setPat] = useState(githubPat)
   const [gist, setGist] = useState(gistId)
   const [curr, setCurr] = useState(currency)
+  const [payday, setPayday] = useState(paycycleDay)
   const [exportStatus, setExportStatus] = useState<SyncStatus>('idle')
   const [importStatus, setImportStatus] = useState<SyncStatus>('idle')
   const [showExportPreview, setShowExportPreview] = useState(false)
@@ -177,11 +178,13 @@ export default function Settings() {
   useEffect(() => { setPat(githubPat) }, [githubPat])
   useEffect(() => { setGist(gistId) }, [gistId])
   useEffect(() => { setCurr(currency) }, [currency])
+  useEffect(() => { setPayday(paycycleDay) }, [paycycleDay])
 
   async function handleSaveCredentials() {
     await setSetting('githubPat', pat)
     await setSetting('gistId', gist)
     await setSetting('currency', curr)
+    await setSetting('paycycleDay', String(payday))
     toast.success('Saved', 'Settings updated successfully.')
   }
 
@@ -281,6 +284,45 @@ export default function Settings() {
           <div className="space-y-1.5">
             <Label>Default Currency</Label>
             <CurrencySelect value={curr} onChange={setCurr} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Paycheck Cycle */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays className="h-4 w-4" /> Paycheck Cycle
+          </CardTitle>
+          <CardDescription>
+            Day of month your paycheck arrives. Used for the "Last Pay Cycle" filter.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Payday (day of month)</Label>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min={1}
+                max={28}
+                value={payday}
+                onChange={(e) => {
+                  const v = Math.min(28, Math.max(1, parseInt(e.target.value, 10) || 1))
+                  setPayday(v)
+                }}
+                className="w-24"
+              />
+              <span className="text-sm text-muted-foreground">
+                {(() => {
+                  const { start, end } = getPaycycleDateRange(payday)
+                  return `Current cycle: ${start} → ${end}`
+                })()}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Capped at 28 to work in all months.
+            </p>
           </div>
         </CardContent>
       </Card>
