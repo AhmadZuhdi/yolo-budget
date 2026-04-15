@@ -98,7 +98,15 @@ export async function importFromGist(pat: string, gistId: string): Promise<GistS
 // ─── Restore (destructive) ────────────────────────────────────────────────────
 
 export async function restoreFromPayload(payload: GistSyncPayload): Promise<void> {
-  // Clear all tables (preserve settings like PAT/GistID)
+  // Preserve credentials and user preferences before wiping data tables
+  const [savedPat, savedGistId, savedCurrency, savedTheme] = await Promise.all([
+    db.settings.get('githubPat'),
+    db.settings.get('gistId'),
+    db.settings.get('currency'),
+    db.settings.get('theme'),
+  ])
+
+  // Clear all data tables (settings table is intentionally untouched)
   await Promise.all([
     db.accounts.clear(),
     db.transactions.clear(),
@@ -117,7 +125,18 @@ export async function restoreFromPayload(payload: GistSyncPayload): Promise<void
     db.recurring.bulkAdd(strip(payload.recurring) as Parameters<typeof db.recurring.bulkAdd>[0]),
   ])
 
-  await db.settings.put({ key: 'lastSyncAt', value: new Date().toISOString() })
+  // Re-write preserved settings so they survive the restore
+  const toRestore = [
+    savedPat      && { key: 'githubPat' as const, value: savedPat.value },
+    savedGistId   && { key: 'gistId'    as const, value: savedGistId.value },
+    savedCurrency && { key: 'currency'  as const, value: savedCurrency.value },
+    savedTheme    && { key: 'theme'     as const, value: savedTheme.value },
+  ].filter(Boolean) as { key: 'githubPat' | 'gistId' | 'currency' | 'theme'; value: string }[]
+
+  await Promise.all([
+    ...toRestore.map((s) => db.settings.put(s)),
+    db.settings.put({ key: 'lastSyncAt', value: new Date().toISOString() }),
+  ])
 }
 
 // ─── Create new Gist ─────────────────────────────────────────────────────────
