@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Settings as SettingsIcon, Github, Upload, Download, Check, Loader2, Trash2, ChevronDown, Search, Info, CalendarDays } from 'lucide-react'
+import { Settings as SettingsIcon, Github, Upload, Download, Check, Loader2, Trash2, ChevronDown, Search, Info, CalendarDays, BrainCircuit, Copy, FileText } from 'lucide-react'
 import pkg from '../../package.json'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useSettings } from '@/hooks/useSettings'
 import { exportToGist, restoreFromPayload, createNewGist } from '@/utils/gistSync'
+import { buildLLMExport } from '@/utils/llmExport'
 import { ImportPreviewDialog, ExportPreviewDialog } from '@/components/staging/ImportPreviewDialog'
 import type { GistSyncPayload } from '@/db/types'
 import { formatDate, getPaycycleDateRange, cn } from '@/lib/utils'
@@ -171,6 +172,7 @@ export default function Settings() {
   const [payday, setPayday] = useState(paycycleDay)
   const [exportStatus, setExportStatus] = useState<SyncStatus>('idle')
   const [importStatus, setImportStatus] = useState<SyncStatus>('idle')
+  const [llmStatus, setLlmStatus] = useState<'idle' | 'loading' | 'copied' | 'downloaded'>('idle')
   const [showExportPreview, setShowExportPreview] = useState(false)
   const [showImportPreview, setShowImportPreview] = useState(false)
 
@@ -244,6 +246,40 @@ export default function Settings() {
     } catch (err) {
       setImportStatus('error')
       toast.error('Import failed', String(err))
+    }
+  }
+
+  async function handleLLMCopy() {
+    try {
+      setLlmStatus('loading')
+      const text = await buildLLMExport()
+      await navigator.clipboard.writeText(text)
+      setLlmStatus('copied')
+      toast.success('Copied to clipboard', 'Paste it into any LLM chat to start analyzing.')
+      setTimeout(() => setLlmStatus('idle'), 3000)
+    } catch {
+      toast.error('Copy failed', 'Your browser may not support clipboard access.')
+      setLlmStatus('idle')
+    }
+  }
+
+  async function handleLLMDownload() {
+    try {
+      setLlmStatus('loading')
+      const text = await buildLLMExport()
+      const blob = new Blob([text], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `yolo-export-${new Date().toISOString().split('T')[0]}.md`
+      a.click()
+      URL.revokeObjectURL(url)
+      setLlmStatus('downloaded')
+      toast.success('Downloaded', 'Markdown file saved.')
+      setTimeout(() => setLlmStatus('idle'), 3000)
+    } catch {
+      toast.error('Download failed', 'Could not generate the export file.')
+      setLlmStatus('idle')
     }
   }
 
@@ -408,6 +444,63 @@ export default function Settings() {
                 <Download className="h-4 w-4" />
               )}
               Import
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* AI Analysis Export */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BrainCircuit className="h-4 w-4" /> AI Analysis Export
+          </CardTitle>
+          <CardDescription>
+            Export your full financial data as structured Markdown — optimised for pasting into ChatGPT, Claude, Gemini, or any LLM for analysis.
+            Includes account balances, monthly cash flow, expenses by tag, budget status, and the full transaction ledger.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="rounded-md border border-border bg-secondary/30 p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">What's included</p>
+            <ul className="list-disc list-inside space-y-0.5">
+              <li>Net worth & account balances</li>
+              <li>Monthly income / expense / net (last 6 months)</li>
+              <li>All-time expenses grouped by tag</li>
+              <li>Budget status for current period</li>
+              <li>Full committed transaction ledger</li>
+            </ul>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              onClick={handleLLMCopy}
+              disabled={llmStatus === 'loading'}
+              className="flex items-center gap-2"
+            >
+              {llmStatus === 'loading' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : llmStatus === 'copied' ? (
+                <Check className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+              {llmStatus === 'copied' ? 'Copied!' : 'Copy to clipboard'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleLLMDownload}
+              disabled={llmStatus === 'loading'}
+              className="flex items-center gap-2"
+            >
+              {llmStatus === 'loading' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : llmStatus === 'downloaded' ? (
+                <Check className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              {llmStatus === 'downloaded' ? 'Saved!' : 'Download .md'}
             </Button>
           </div>
         </CardContent>
