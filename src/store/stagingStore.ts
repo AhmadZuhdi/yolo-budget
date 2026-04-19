@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { db } from '@/db/db'
 import type { StagedTransaction, TransactionType } from '@/db/types'
+import { evalAmount } from '@/lib/utils'
 
 function uuid(): string {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
@@ -96,11 +97,29 @@ export interface ParsedTerminalInput {
   accountName?: string
   toAccountName?: string
   transferFee?: number
+  date?: string   // YYYY-MM-DD; undefined = today
   error?: string
 }
 
+function resolveDateToken(raw: string): string | null {
+  const today = new Date()
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  const lower = raw.toLowerCase()
+  if (lower === 'today') return fmt(today)
+  if (lower === 'yesterday') {
+    const d = new Date(today); d.setDate(d.getDate() - 1); return fmt(d)
+  }
+  const relMatch = lower.match(/^-(\d+)$/)
+  if (relMatch) {
+    const d = new Date(today); d.setDate(d.getDate() - parseInt(relMatch[1])); return fmt(d)
+  }
+  // full YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  return null
+}
+
 export function parseTerminalInput(input: string): ParsedTerminalInput | null {
-  const trimmed = input.trim()
+  let trimmed = input.trim()
   if (!trimmed) return null
 
   const result: ParsedTerminalInput = {
@@ -108,6 +127,20 @@ export function parseTerminalInput(input: string): ParsedTerminalInput | null {
     amount: 0,
     description: '',
     tags: [],
+  }
+
+  // Extract date token (d:...) before other parsing
+  const dateTokenMatch = trimmed.match(/(?:^|\s)(d:\S+)/)
+  if (dateTokenMatch) {
+    const raw = dateTokenMatch[1].slice(2) // strip "d:"
+    const resolved = resolveDateToken(raw)
+    if (resolved) {
+      result.date = resolved
+    } else {
+      result.error = `Invalid date: ${raw}. Use d:YYYY-MM-DD, d:today, d:yesterday, or d:-N`
+      return result
+    }
+    trimmed = trimmed.replace(dateTokenMatch[1], '').replace(/\s{2,}/g, ' ').trim()
   }
 
   // Extract tags (#word)
@@ -128,16 +161,18 @@ export function parseTerminalInput(input: string): ParsedTerminalInput | null {
   const prefix = trimmed[0]
 
   if (prefix === '>') {
-    // Transfer: >500 @Bank to @Cash
+    // Transfer: >500 @Bank to @Cash  or  >(500+200) @Bank to @Cash
     result.type = 'transfer'
-    const amountMatch = trimmed.match(/^>([\d.]+)/)
+    const amountMatch = trimmed.match(/^>([\d.+\-*/()]+)/)
     if (!amountMatch) { result.error = 'Missing amount after >'; return result }
-    result.amount = parseFloat(amountMatch[1])
+    const evaled = evalAmount(amountMatch[1])
+    if (evaled === null) { result.error = `Invalid expression: ${amountMatch[1]}`; return result }
+    result.amount = evaled
     result.accountName = accounts[0]
     result.toAccountName = accounts[1]
     // Description = everything between amount and first @/#/fee
     const desc = trimmed
-      .replace(/^>[\d.]+\s*/, '')
+      .replace(/^>[\d.+\-*/()]+\s*/, '')
       .replace(/#[\w-]+/g, '')
       .replace(/@[\w\s]+/g, '')
       .replace(/fee:[\d.]+/gi, '')
@@ -146,24 +181,28 @@ export function parseTerminalInput(input: string): ParsedTerminalInput | null {
     result.description = desc || 'Transfer'
   } else if (prefix === '+') {
     result.type = 'income'
-    const amountMatch = trimmed.match(/^\+([\d.]+)/)
+    const amountMatch = trimmed.match(/^\+([\d.+\-*/()]+)/)
     if (!amountMatch) { result.error = 'Missing amount after +'; return result }
-    result.amount = parseFloat(amountMatch[1])
+    const evaled = evalAmount(amountMatch[1])
+    if (evaled === null) { result.error = `Invalid expression: ${amountMatch[1]}`; return result }
+    result.amount = evaled
     result.accountName = accounts[0]
     const desc = trimmed
-      .replace(/^\+[\d.]+\s*/, '')
+      .replace(/^\+[\d.+\-*/()]+\s*/, '')
       .replace(/#[\w-]+/g, '')
       .replace(/@[\w\s]+/g, '')
       .trim()
     result.description = desc || 'Income'
   } else if (prefix === '-') {
     result.type = 'expense'
-    const amountMatch = trimmed.match(/^-([\d.]+)/)
+    const amountMatch = trimmed.match(/^-([\d.+\-*/()]+)/)
     if (!amountMatch) { result.error = 'Missing amount after -'; return result }
-    result.amount = parseFloat(amountMatch[1])
+    const evaled = evalAmount(amountMatch[1])
+    if (evaled === null) { result.error = `Invalid expression: ${amountMatch[1]}`; return result }
+    result.amount = evaled
     result.accountName = accounts[0]
     const desc = trimmed
-      .replace(/^-[\d.]+\s*/, '')
+      .replace(/^-[\d.+\-*/()]+\s*/, '')
       .replace(/#[\w-]+/g, '')
       .replace(/@[\w\s]+/g, '')
       .trim()

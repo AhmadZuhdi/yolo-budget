@@ -10,6 +10,7 @@ const HINTS = [
   '+2000 Salary #income @Bank',
   '>500 @Bank to @Cash #atm',
   '-120 Groceries #food #household @Cash',
+  '-80 Dinner #food @Cash d:yesterday',
 ]
 
 // ── Token colours ────────────────────────────────────────────────────────────
@@ -60,6 +61,8 @@ function tokenize(value: string): Token[] {
       tokens.push({ text: part, color: '#fbbf24' }) // amber-400
     } else if (/^fee:\S*$/.test(part)) {
       tokens.push({ text: part, color: '#a1a1aa' }) // zinc-400
+    } else if (/^d:\S*$/.test(part)) {
+      tokens.push({ text: part, color: '#38bdf8' }) // sky-400
     } else if (/^to$/.test(part)) {
       // "to" keyword in transfers
       tokens.push({ text: part, color: '#94a3b8' }) // slate-400
@@ -200,6 +203,8 @@ export function TerminalInput() {
     const accountId = resolveAccountId(parsed.accountName)
     if (!accountId) { setError('No accounts found. Create one first.'); return }
 
+    const today = new Date().toISOString().split('T')[0]
+
     if (parsed.type === 'transfer') {
       const toAccountId = resolveAccountId(parsed.toAccountName)
       if (!toAccountId || toAccountId === accountId) {
@@ -211,7 +216,7 @@ export function TerminalInput() {
         accountId,
         toAccountId,
         amount: parsed.amount,
-        date: new Date().toISOString().split('T')[0],
+        date: parsed.date ?? today,
         description: parsed.description,
         tags: parsed.tags,
         transferFee: parsed.transferFee,
@@ -221,7 +226,7 @@ export function TerminalInput() {
         type: parsed.type,
         accountId,
         amount: parsed.amount,
-        date: new Date().toISOString().split('T')[0],
+        date: parsed.date ?? today,
         description: parsed.description,
         tags: parsed.tags,
       })
@@ -327,7 +332,8 @@ export function TerminalInput() {
           <span className="text-blue-400">&gt;</span> transfer &nbsp;
           <span className="text-violet-400">#tag</span> &nbsp;
           <span className="text-amber-400">@account</span> &nbsp;
-          <span className="text-zinc-400">fee:2.5</span>
+          <span className="text-zinc-400">fee:2.5</span> &nbsp;
+          <span className="text-sky-400">d:yesterday</span>
         </p>
         <p className="text-zinc-700">Tab to complete &middot; &uarr;&darr; to navigate &middot; Esc to dismiss</p>
       </div>
