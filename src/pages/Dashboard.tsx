@@ -97,9 +97,10 @@ function ExpenseByTag() {
   const { currency } = useSettings()
   const { hideAmounts } = useStagingStore()
 
-  // Aggregate: tag → total expense amount
+  // Aggregate: tag → total expense amount (exclude reconciliation adjustments)
   const tagMap = new Map<string, number>()
   for (const tx of transactions) {
+    if (tx.tags.includes('reconciliation')) continue
     if (tx.tags.length === 0) {
       tagMap.set('(untagged)', (tagMap.get('(untagged)') ?? 0) + tx.amount)
     } else {
