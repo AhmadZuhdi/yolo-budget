@@ -6,12 +6,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { AmountInput } from '@/components/ui/amount-input'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { useStagingStore } from '@/store/stagingStore'
 import { db } from '@/db/db'
 import { toast } from '@/hooks/useToast'
-import { cn, getCurrencySymbol, formatCurrency } from '@/lib/utils'
+import { cn, getCurrencySymbol, formatCurrency, evalAmount } from '@/lib/utils'
 import type { TransactionType } from '@/db/types'
 
 interface TransactionFormProps {
@@ -79,8 +80,11 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
     tags.includes(tag) ? removeTag(tag) : setTags((prev) => [...prev, tag])
   }
 
+  const parsedAmount = evalAmount(amount) ?? parseFloat(amount)
+  const parsedFee = transferFee ? (evalAmount(transferFee) ?? parseFloat(transferFee)) : undefined
+
   const isValid =
-    amount && parseFloat(amount) > 0 &&
+    amount && parsedAmount > 0 &&
     accountId &&
     (type !== 'transfer' || (toAccountId && toAccountId !== accountId))
 
@@ -92,12 +96,12 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
     const txBase = {
       type,
       accountId: Number(accountId),
-      amount: parseFloat(amount),
+      amount: parsedAmount,
       date,
       description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
       tags,
       toAccountId:  type === 'transfer' ? Number(toAccountId) : undefined,
-      transferFee:  type === 'transfer' && transferFee ? parseFloat(transferFee) : undefined,
+      transferFee:  type === 'transfer' && parsedFee ? parsedFee : undefined,
     }
 
     try {
@@ -106,7 +110,7 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
         toast.info('Staged', `"${txBase.description}" added to queue`)
       } else {
         await db.transactions.add({ ...txBase, isCommitted: true, createdAt: new Date().toISOString() })
-        toast.success('Saved', `${type === 'income' ? '+' : '-'}${formatCurrency(parseFloat(amount), currency)} — ${txBase.description}`)
+        toast.success('Saved', `${type === 'income' ? '+' : '-'}${formatCurrency(parsedAmount, currency)} — ${txBase.description}`)
       }
       reset()
       onClose()
@@ -153,19 +157,14 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
           {/* Amount */}
           <div className="space-y-1.5">
             <Label>Amount</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">{currencySymbol}</span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="pl-7 text-lg font-semibold"
-                placeholder="0.00"
-                autoFocus
-              />
-            </div>
+            <AmountInput
+              value={amount}
+              onChange={setAmount}
+              prefix={currencySymbol}
+              placeholder="0.00"
+              autoFocus
+              className="text-lg font-semibold"
+            />
           </div>
 
           {/* Account(s) */}
@@ -207,18 +206,12 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
           {type === 'transfer' && (
             <div className="space-y-1.5">
               <Label>Transfer Fee <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{currencySymbol}</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={transferFee}
-                  onChange={(e) => setTransferFee(e.target.value)}
-                  className="pl-7"
-                  placeholder="0.00"
-                />
-              </div>
+              <AmountInput
+                value={transferFee}
+                onChange={setTransferFee}
+                prefix={currencySymbol}
+                placeholder="0.00"
+              />
             </div>
           )}
 

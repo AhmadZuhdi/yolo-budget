@@ -5,6 +5,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Safely evaluate a math expression string (digits + +-*\/() only).
+ * Returns null if the expression is invalid or the result is not finite.
+ * Examples:
+ *   "10000+5000"  → 15000
+ *   "(-10000-10000)" → -20000
+ *   "1500*12"     → 18000
+ *   "50"          → 50
+ */
+export function evalAmount(expr: string): number | null {
+  const cleaned = expr.replace(/\s/g, '')
+  if (!cleaned) return null
+  // Whitelist: digits, decimal point, operators, parentheses
+  if (!/^[\d.+\-*/()]+$/.test(cleaned)) return null
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = new Function(`return (${cleaned})`)() as unknown
+    if (typeof result !== 'number' || !isFinite(result)) return null
+    return Math.round(result * 100) / 100  // round to 2dp
+  } catch {
+    return null
+  }
+}
+
 export function formatCurrency(amount: number, currency = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

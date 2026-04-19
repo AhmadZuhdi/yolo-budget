@@ -90,32 +90,14 @@ export default function Transactions() {
           <Button
             variant="outline"
             size="sm"
-            onClick={togglePayCycle}
-            className={cn(payCycleActive && 'border-primary text-primary bg-primary/10')}
-          >
-            Pay Cycle
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => setShowFilters((s) => !s)}
-            className={cn(showFilters && 'border-primary text-primary')}
+            className={cn((showFilters || payCycleActive) && 'border-primary text-primary')}
           >
             <Filter className="h-3.5 w-3.5 mr-1.5" />
-            Filter
+            Filter{payCycleActive && ' •'}
           </Button>
         </div>
       </div>
-
-      {payCycleActive && (
-        <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 border border-primary/20 rounded-lg px-3 py-2">
-          <span className="font-medium">Pay Cycle:</span>
-          <span>{filters.startDate} → {filters.endDate}</span>
-          <button onClick={togglePayCycle} className="ml-auto hover:text-foreground transition-colors">
-            <X className="h-3.5 w-3.5" />
-          </button>
-        </div>
-      )}
 
       <ReconcileDialog open={showReconcile} onOpenChange={setShowReconcile} />
 
@@ -129,6 +111,22 @@ export default function Transactions() {
       {showFilters && (
         <Card>
           <CardContent className="p-4 space-y-3">
+            {/* Pay Cycle quick filter */}
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Quick filter</label>
+              <button
+                onClick={togglePayCycle}
+                className={cn(
+                  'text-xs px-3 py-1.5 rounded-md border transition-colors',
+                  payCycleActive
+                    ? 'bg-primary/10 border-primary/40 text-primary'
+                    : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Pay Cycle{payCycleActive && filters.startDate ? `: ${filters.startDate} → ${filters.endDate}` : ''}
+              </button>
+            </div>
+
             <div className="grid grid-cols-2 gap-3">
               {/* Account filter */}
               <div className="space-y-1">

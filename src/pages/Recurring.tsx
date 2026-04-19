@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
+import { AmountInput } from '@/components/ui/amount-input'
 import { useRecurring } from '@/hooks/useRecurring'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, evalAmount } from '@/lib/utils'
 import { toast } from '@/hooks/useToast'
 import type { RecurringFrequency, TransactionType } from '@/db/types'
 
@@ -36,7 +37,7 @@ function AddRecurringDialog({ open, onClose }: { open: boolean; onClose: () => v
       templateTransaction: {
         accountId: Number(form.accountId),
         type: form.type,
-        amount: parseFloat(form.amount),
+        amount: evalAmount(form.amount) ?? parseFloat(form.amount),
         description: form.description,
         tags: form.tags ? form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) : [],
       },
@@ -62,8 +63,8 @@ function AddRecurringDialog({ open, onClose }: { open: boolean; onClose: () => v
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label>Amount</Label>
-              <Input type="number" step="0.01" min="0.01" value={form.amount}
-                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+              <AmountInput value={form.amount}
+                onChange={(v) => setForm((f) => ({ ...f, amount: v }))} />
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>

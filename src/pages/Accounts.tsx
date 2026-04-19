@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
+import { AmountInput } from '@/components/ui/amount-input'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useStagingStore } from '@/store/stagingStore'
 import { useSettings } from '@/hooks/useSettings'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, evalAmount } from '@/lib/utils'
 import { toast } from '@/hooks/useToast'
 import type { AccountType, AccountWithBalance } from '@/db/types'
 
@@ -112,11 +113,9 @@ function AccountFormDialog({
           </div>
           <div className="space-y-1.5">
             <Label>Initial Balance</Label>
-            <Input
-              type="number"
-              step="0.01"
+            <AmountInput
               value={form.initialBalance}
-              onChange={(e) => setForm((f) => ({ ...f, initialBalance: e.target.value }))}
+              onChange={(v) => setForm((f) => ({ ...f, initialBalance: v }))}
             />
           </div>
           <div className="space-y-1.5">
@@ -203,11 +202,11 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
       type: 'transfer',
       accountId: Number(form.fromId),
       toAccountId: Number(form.toId),
-      amount: parseFloat(form.amount),
+      amount: evalAmount(form.amount) ?? parseFloat(form.amount),
       date: new Date().toISOString().split('T')[0],
       description: form.description || 'Transfer',
       tags: form.tags ? form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) : [],
-      transferFee: form.fee ? parseFloat(form.fee) : undefined,
+      transferFee: form.fee ? (evalAmount(form.fee) ?? parseFloat(form.fee)) : undefined,
     })
 
     toast.info('Transfer staged', 'Review it in the staging area, then commit.')
@@ -249,13 +248,13 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
           </div>
           <div className="space-y-1.5">
             <Label>Amount</Label>
-            <Input type="number" step="0.01" min="0.01" value={form.amount}
-              onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} />
+            <AmountInput value={form.amount}
+              onChange={(v) => setForm((f) => ({ ...f, amount: v }))} />
           </div>
           <div className="space-y-1.5">
             <Label>Transfer Fee (optional)</Label>
-            <Input type="number" step="0.01" min="0" value={form.fee}
-              onChange={(e) => setForm((f) => ({ ...f, fee: e.target.value }))}
+            <AmountInput value={form.fee}
+              onChange={(v) => setForm((f) => ({ ...f, fee: v }))}
               placeholder="0.00" />
           </div>
           <div className="space-y-1.5">

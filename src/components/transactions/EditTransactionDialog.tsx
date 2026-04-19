@@ -6,11 +6,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { AmountInput } from '@/components/ui/amount-input'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { useTransactions } from '@/hooks/useTransactions'
 import { toast } from '@/hooks/useToast'
-import { cn, getCurrencySymbol } from '@/lib/utils'
+import { cn, getCurrencySymbol, evalAmount } from '@/lib/utils'
 import type { Transaction, TransactionType } from '@/db/types'
 
 interface EditTransactionDialogProps {
@@ -77,8 +78,11 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
     tags.includes(tag) ? removeTag(tag) : setTags((prev) => [...prev, tag])
   }
 
+  const parsedAmount = evalAmount(amount) ?? parseFloat(amount)
+  const parsedFee = transferFee ? (evalAmount(transferFee) ?? parseFloat(transferFee)) : undefined
+
   const isValid =
-    amount && parseFloat(amount) > 0 &&
+    amount && parsedAmount > 0 &&
     accountId &&
     (type !== 'transfer' || (toAccountId && toAccountId !== accountId))
 
@@ -91,12 +95,12 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
       await updateTransaction(transaction.id, {
         type,
         accountId: Number(accountId),
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         date,
         description: description.trim() || (type === 'transfer' ? 'Transfer' : type === 'income' ? 'Income' : 'Expense'),
         tags,
         toAccountId: type === 'transfer' ? Number(toAccountId) : undefined,
-        transferFee: type === 'transfer' && transferFee ? parseFloat(transferFee) : undefined,
+        transferFee: type === 'transfer' && parsedFee ? parsedFee : undefined,
       })
       toast.success('Transaction updated')
       onOpenChange(false)
@@ -138,19 +142,14 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           {/* Amount */}
           <div className="space-y-1.5">
             <Label>Amount</Label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">{currencySymbol}</span>
-              <Input
-                type="number"
-                step="0.01"
-                min="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                className="pl-7 text-lg font-semibold"
-                placeholder="0.00"
-                autoFocus
-              />
-            </div>
+            <AmountInput
+              value={amount}
+              onChange={setAmount}
+              prefix={currencySymbol}
+              placeholder="0.00"
+              autoFocus
+              className="text-lg font-semibold"
+            />
           </div>
 
           {/* Account(s) */}
@@ -192,18 +191,12 @@ export function EditTransactionDialog({ transaction, open, onOpenChange }: EditT
           {type === 'transfer' && (
             <div className="space-y-1.5">
               <Label>Transfer Fee <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{currencySymbol}</span>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={transferFee}
-                  onChange={(e) => setTransferFee(e.target.value)}
-                  className="pl-7"
-                  placeholder="0.00"
-                />
-              </div>
+              <AmountInput
+                value={transferFee}
+                onChange={setTransferFee}
+                prefix={currencySymbol}
+                placeholder="0.00"
+              />
             </div>
           )}
 

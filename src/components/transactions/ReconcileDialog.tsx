@@ -9,14 +9,14 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { AmountInput } from '@/components/ui/amount-input'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { db, computeAccountBalance } from '@/db/db'
 import { toast } from '@/hooks/useToast'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, evalAmount } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 interface ReconcileDialogProps {
@@ -47,7 +47,7 @@ export function ReconcileDialog({ open, onOpenChange }: ReconcileDialogProps) {
     })
   }, [selectedAccountId, open])
 
-  const parsedActual = parseFloat(actualBalance)
+  const parsedActual = evalAmount(actualBalance) ?? parseFloat(actualBalance)
   const difference =
     currentBalance !== null && !isNaN(parsedActual)
       ? parsedActual - currentBalance
@@ -154,13 +154,11 @@ export function ReconcileDialog({ open, onOpenChange }: ReconcileDialogProps) {
           {/* Actual balance input */}
           <div className="space-y-1.5">
             <Label htmlFor="actual-balance">Actual balance</Label>
-            <Input
+            <AmountInput
               id="actual-balance"
-              type="number"
-              step="0.01"
-              placeholder="0.00"
               value={actualBalance}
-              onChange={(e) => setActualBalance(e.target.value)}
+              onChange={setActualBalance}
+              placeholder="0.00"
             />
           </div>
 
