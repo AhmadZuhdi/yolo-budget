@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, Tag } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
@@ -92,6 +92,58 @@ function BudgetOverview() {
   )
 }
 
+function ExpenseByTag() {
+  const { transactions } = useTransactions({ committedOnly: true, type: 'expense' })
+  const { currency } = useSettings()
+  const { hideAmounts } = useStagingStore()
+
+  // Aggregate: tag → total expense amount
+  const tagMap = new Map<string, number>()
+  for (const tx of transactions) {
+    if (tx.tags.length === 0) {
+      tagMap.set('(untagged)', (tagMap.get('(untagged)') ?? 0) + tx.amount)
+    } else {
+      for (const tag of tx.tags) {
+        tagMap.set(tag, (tagMap.get(tag) ?? 0) + tx.amount)
+      }
+    }
+  }
+
+  if (tagMap.size === 0) return null
+
+  const sorted = Array.from(tagMap.entries()).sort((a, b) => b[1] - a[1])
+  const max = sorted[0][1]
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
+          <Tag className="h-3.5 w-3.5" />
+          Expenses by Tag
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {sorted.map(([tag, total]) => (
+          <div key={tag} className="space-y-1">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-violet-400 font-mono text-xs">#{tag}</span>
+              <span className="text-red-400 font-semibold text-xs">
+                {hideAmounts ? MASK : formatCurrency(total, currency)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-red-500/60"
+                style={{ width: `${(total / max) * 100}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function Dashboard() {
   return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto md:p-6">
@@ -103,6 +155,7 @@ export default function Dashboard() {
       <NetWorthCard />
       <CashFlowCard />
       <BudgetOverview />
+      <ExpenseByTag />
       <RecentTransactions />
     </div>
   )

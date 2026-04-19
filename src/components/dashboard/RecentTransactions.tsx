@@ -16,7 +16,7 @@ export function RecentTransactions() {
   const { currency } = useSettings()
   const { hideAmounts } = useStagingStore()
 
-  const recent = transactions.slice(0, 8)
+  const recent = transactions.slice(0, 5)
 
   function getAccount(id: number) {
     return accounts.find((a) => a.id === id)
