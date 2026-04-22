@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, ArrowRight, Filter, X, Scale, Trash2, Pencil } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,9 +16,18 @@ import { toast } from '@/hooks/useToast'
 import type { Transaction } from '@/db/types'
 
 export default function Transactions() {
+  const [searchParams] = useSearchParams()
   const [filters, setFilters] = useState<TransactionFilters>({ committedOnly: true })
   const [showFilters, setShowFilters] = useState(false)
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>(() => {
+    const tag = searchParams.get('tag')
+    return tag ? [tag] : []
+  })
+
+  // Open filter panel automatically if a tag was pre-selected via URL
+  useEffect(() => {
+    if (searchParams.get('tag')) setShowFilters(true)
+  }, [])
   const [showReconcile, setShowReconcile] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)

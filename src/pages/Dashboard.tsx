@@ -1,4 +1,5 @@
 import { TrendingUp, TrendingDown, Tag, Eye, EyeOff } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
@@ -140,20 +141,24 @@ function ExpenseByTag() {
       </CardHeader>
       <CardContent className="space-y-2">
         {sorted.map(([tag, total]) => (
-          <div key={tag} className="space-y-1">
+          <Link
+            key={tag}
+            to={tag === '(untagged)' ? '/transactions' : `/transactions?tag=${encodeURIComponent(tag)}`}
+            className="block space-y-1 group"
+          >
             <div className="flex items-center justify-between text-sm">
-              <span className="text-violet-400 font-mono text-xs">#{tag}</span>
+              <span className="text-violet-400 font-mono text-xs group-hover:text-violet-300 transition-colors">#{tag}</span>
               <span className="text-red-400 font-semibold text-xs">
                 {hideAmounts ? MASK : formatCurrency(total, currency)}
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
               <div
-                className="h-full rounded-full bg-red-500/60"
+                className="h-full rounded-full bg-red-500/60 group-hover:bg-red-500/80 transition-colors"
                 style={{ width: `${(total / max) * 100}%` }}
               />
             </div>
-          </div>
+          </Link>
         ))}
       </CardContent>
     </Card>
