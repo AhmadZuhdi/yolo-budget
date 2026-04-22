@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Tag } from 'lucide-react'
+import { TrendingUp, TrendingDown, Tag, Eye, EyeOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
@@ -15,17 +15,22 @@ const MASK = '••••••'
 function CashFlowCard() {
   const { currency, paycycleDay } = useSettings()
   const { paycycleFlow } = useTransactions({}, paycycleDay)
-  const { hideAmounts } = useStagingStore()
+  const { hideAmounts, toggleHideAmounts } = useStagingStore()
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
-          Pay Cycle
-          {paycycleFlow.start && (
-            <span className="ml-2 font-normal text-xs">
-              {paycycleFlow.start} → {paycycleFlow.end}
-            </span>
-          )}
+        <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground">
+          <span>
+            Pay Cycle
+            {paycycleFlow.start && (
+              <span className="ml-2 font-normal text-xs">
+                {paycycleFlow.start} → {paycycleFlow.end}
+              </span>
+            )}
+          </span>
+          <button onClick={toggleHideAmounts} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={hideAmounts ? 'Show amounts' : 'Hide amounts'}>
+            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent className="grid grid-cols-2 gap-3">
@@ -55,13 +60,18 @@ function CashFlowCard() {
 function BudgetOverview() {
   const { budgets } = useBudgets()
   const { currency } = useSettings()
-  const { hideAmounts } = useStagingStore()
+  const { hideAmounts, toggleHideAmounts } = useStagingStore()
   if (budgets.length === 0) return null
 
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">Budget Progress</CardTitle>
+        <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground">
+          <span>Budget Progress</span>
+          <button onClick={toggleHideAmounts} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={hideAmounts ? 'Show amounts' : 'Hide amounts'}>
+            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {budgets.slice(0, 4).map((b) => (
@@ -95,7 +105,7 @@ function BudgetOverview() {
 function ExpenseByTag() {
   const { transactions } = useTransactions({ committedOnly: true, type: 'expense' })
   const { currency } = useSettings()
-  const { hideAmounts } = useStagingStore()
+  const { hideAmounts, toggleHideAmounts } = useStagingStore()
 
   // Aggregate: tag → total expense amount (exclude reconciliation adjustments)
   const tagMap = new Map<string, number>()
@@ -118,9 +128,14 @@ function ExpenseByTag() {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5">
-          <Tag className="h-3.5 w-3.5" />
-          Expenses by Tag
+        <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-between">
+          <span className="flex items-center gap-1.5">
+            <Tag className="h-3.5 w-3.5" />
+            Expenses by Tag
+          </span>
+          <button onClick={toggleHideAmounts} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={hideAmounts ? 'Show amounts' : 'Hide amounts'}>
+            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">

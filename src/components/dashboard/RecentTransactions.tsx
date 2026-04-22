@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { TrendingUp, TrendingDown, ArrowRight as Transfer, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowRight as Transfer, ChevronRight, Eye, EyeOff } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useTransactions } from '@/hooks/useTransactions'
@@ -14,7 +14,7 @@ export function RecentTransactions() {
   const { transactions } = useTransactions({ committedOnly: true })
   const { accounts } = useAccounts()
   const { currency } = useSettings()
-  const { hideAmounts } = useStagingStore()
+  const { hideAmounts, toggleHideAmounts } = useStagingStore()
 
   const recent = transactions.slice(0, 5)
 
@@ -28,12 +28,17 @@ export function RecentTransactions() {
         <CardTitle className="text-sm font-medium text-muted-foreground">
           Recent Transactions
         </CardTitle>
-        <Link
-          to="/transactions"
-          className="flex items-center gap-1 text-xs text-primary hover:underline"
-        >
-          View all <ChevronRight className="h-3 w-3" />
-        </Link>
+        <div className="flex items-center gap-2">
+          <button onClick={toggleHideAmounts} className="text-muted-foreground hover:text-foreground transition-colors" aria-label={hideAmounts ? 'Show amounts' : 'Hide amounts'}>
+            {hideAmounts ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+          <Link
+            to="/transactions"
+            className="flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            View all <ChevronRight className="h-3 w-3" />
+          </Link>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         {recent.length === 0 ? (
