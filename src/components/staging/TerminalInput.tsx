@@ -100,7 +100,7 @@ export function TerminalInput() {
   const [suggestionType, setSuggestionType] = useState<'@' | '#' | null>(null)
   const [activeIdx, setActiveIdx] = useState(0)
   const [tokenStart, setTokenStart] = useState(-1)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
   const mirrorRef = useRef<HTMLDivElement>(null)
   const suggestionsRef = useRef<HTMLUListElement>(null)
   const { addToStaging } = useStagingStore()
@@ -144,11 +144,19 @@ export function TerminalInput() {
     [accounts, allTags]
   )
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function autoGrow() {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = el.scrollHeight + 'px'
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const val = e.target.value
     setValue(val)
     setError('')
     computeSuggestions(val, e.target.selectionStart ?? val.length)
+    autoGrow()
   }
 
   function applySuggestion(suggestion: string) {
@@ -168,7 +176,17 @@ export function TerminalInput() {
     }, 0)
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Submit on Enter (without Shift)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      if (suggestions.length > 0) {
+        applySuggestion(suggestions[activeIdx])
+        return
+      }
+      handleSubmit(e as unknown as React.FormEvent)
+      return
+    }
     if (suggestions.length === 0) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
@@ -233,6 +251,7 @@ export function TerminalInput() {
     }
 
     setValue('')
+    if (inputRef.current) { inputRef.current.style.height = 'auto' }
     inputRef.current?.focus()
   }
 
@@ -245,11 +264,11 @@ export function TerminalInput() {
         <span>Quick entry — type a command and press Enter</span>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2">
+      <form onSubmit={handleSubmit} className="flex gap-2 items-end">
         <div className="relative flex-1">
 
-          {/* ── Actual input — sits below, provides bg + border + caret ── */}
-          <input
+          {/* ── Actual textarea — sits below, provides bg + border + caret ── */}
+          <textarea
             ref={inputRef}
             value={value}
             onChange={handleChange}
@@ -259,19 +278,20 @@ export function TerminalInput() {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
+            rows={1}
             className={cn(
-              'terminal-input w-full h-10 px-3',
+              'terminal-input w-full px-3 py-2.5 resize-none overflow-hidden leading-5',
               'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-green-500/50',
               error ? 'border-red-500/50' : ''
             )}
-            style={{ color: 'transparent', caretColor: error ? '#f87171' : '#4ade80' }}
+            style={{ color: 'transparent', caretColor: error ? '#f87171' : '#4ade80', minHeight: '40px' }}
           />
 
           {/* ── Syntax-highlight mirror — floats on top, pointer-events-none ── */}
           <div
             ref={mirrorRef}
             aria-hidden="true"
-            className="absolute inset-0 flex items-center px-3 pointer-events-none select-none overflow-hidden font-mono text-sm whitespace-pre bg-transparent"
+            className="absolute inset-0 flex items-start px-3 py-2.5 pointer-events-none select-none overflow-hidden font-mono text-sm whitespace-pre-wrap break-all bg-transparent leading-5"
           >
             {value === '' ? null : tokens.map((tok, i) => (
               <span key={i} style={{ color: tok.color }}>{tok.text}</span>
