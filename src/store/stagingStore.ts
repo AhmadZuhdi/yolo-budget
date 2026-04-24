@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { db } from '@/db/db'
 import type { StagedTransaction, TransactionType } from '@/db/types'
-import { evalAmount } from '@/lib/utils'
+import { evalAmount, dateToYMD } from '@/lib/utils'
 
 function uuid(): string {
   return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
@@ -103,7 +103,7 @@ export interface ParsedTerminalInput {
 
 function resolveDateToken(raw: string): string | null {
   const today = new Date()
-  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  const fmt = (d: Date) => dateToYMD(d)
   const lower = raw.toLowerCase()
   if (lower === 'today') return fmt(today)
   if (lower === 'yesterday') {

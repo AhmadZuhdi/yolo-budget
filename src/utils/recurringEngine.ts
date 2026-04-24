@@ -1,6 +1,7 @@
 import { db } from '@/db/db'
 import type { Recurring, RecurringTemplate } from '@/db/types'
 import { addDays, addWeeks, addMonths, addYears, isPast, parseISO } from 'date-fns'
+import { dateToYMD } from '@/lib/utils'
 
 function getNextOccurrence(current: string, frequency: Recurring['frequency']): string {
   const date = parseISO(current)
@@ -12,7 +13,7 @@ function getNextOccurrence(current: string, frequency: Recurring['frequency']): 
     case 'yearly':  next = addYears(date, 1);  break
     default:        next = addMonths(date, 1)
   }
-  return next.toISOString().split('T')[0]
+  return dateToYMD(next)
 }
 
 function templateToTransaction(template: RecurringTemplate, date: string) {

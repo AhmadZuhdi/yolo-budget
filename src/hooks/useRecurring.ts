@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/db'
 import type { Recurring } from '@/db/types'
 import { addDays, addWeeks, addMonths, addYears } from 'date-fns'
+import { dateToYMD } from '@/lib/utils'
 
 function firstOccurrence(frequency: Recurring['frequency']): string {
   const now = new Date()
@@ -13,7 +14,7 @@ function firstOccurrence(frequency: Recurring['frequency']): string {
     case 'yearly':  next = addYears(now, 1);  break
     default:        next = addMonths(now, 1)
   }
-  return next.toISOString().split('T')[0]
+  return dateToYMD(next)
 }
 
 export function useRecurring() {

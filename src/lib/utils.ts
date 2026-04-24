@@ -5,13 +5,25 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+// Returns today's date as YYYY-MM-DD in local time (avoids UTC offset shift)
+export function todayYMD(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Converts any Date to YYYY-MM-DD in local time
+export function dateToYMD(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /**
- * Safely evaluate a math expression string (digits + +-*\/() only).
- * Returns null if the expression is invalid or the result is not finite.
- * Examples:
- *   "10000+5000"  → 15000
- *   "(-10000-10000)" → -20000
- *   "1500*12"     → 18000
+ * Safely evaluate a math expression string
  *   "50"          → 50
  */
 export function evalAmount(expr: string): number | null {

@@ -12,7 +12,7 @@ import { useSettings } from '@/hooks/useSettings'
 import { useStagingStore } from '@/store/stagingStore'
 import { db } from '@/db/db'
 import { toast } from '@/hooks/useToast'
-import { cn, getCurrencySymbol, formatCurrency, evalAmount } from '@/lib/utils'
+import { cn, getCurrencySymbol, formatCurrency, evalAmount, todayYMD } from '@/lib/utils'
 import type { TransactionType } from '@/db/types'
 
 interface TransactionFormProps {
@@ -46,7 +46,7 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
   const [description, setDescription] = useState('')
   const [accountId, setAccountId] = useState<string>(accounts[0]?.id?.toString() ?? '')
   const [toAccountId, setToAccountId] = useState<string>('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(todayYMD())
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [transferFee, setTransferFee] = useState('')
@@ -58,7 +58,7 @@ export function TransactionFormDialog({ open, onClose, defaultType = 'expense' }
     setDescription('')
     setAccountId(accounts[0]?.id?.toString() ?? '')
     setToAccountId('')
-    setDate(new Date().toISOString().split('T')[0])
+    setDate(todayYMD())
     setTags([])
     setTagInput('')
     setTransferFee('')

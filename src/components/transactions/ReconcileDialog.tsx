@@ -16,7 +16,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { db, computeAccountBalance } from '@/db/db'
 import { toast } from '@/hooks/useToast'
-import { formatCurrency, evalAmount } from '@/lib/utils'
+import { formatCurrency, evalAmount, todayYMD } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 
 interface ReconcileDialogProps {
@@ -67,7 +67,7 @@ export function ReconcileDialog({ open, onOpenChange }: ReconcileDialogProps) {
 
     setLoading(true)
     try {
-      const today = new Date().toISOString().split('T')[0]
+      const today = todayYMD()
       const account = accounts.find((a) => a.id === Number(selectedAccountId))
 
       await db.transactions.add({

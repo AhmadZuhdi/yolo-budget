@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useStagingStore, parseTerminalInput } from '@/store/stagingStore'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
-import { cn } from '@/lib/utils'
+import { cn, todayYMD } from '@/lib/utils'
 import { CornerDownLeft, Terminal } from 'lucide-react'
 
 const HINTS = [
@@ -221,7 +221,7 @@ export function TerminalInput() {
     const accountId = resolveAccountId(parsed.accountName)
     if (!accountId) { setError('No accounts found. Create one first.'); return }
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayYMD()
 
     if (parsed.type === 'transfer') {
       const toAccountId = resolveAccountId(parsed.toAccountName)

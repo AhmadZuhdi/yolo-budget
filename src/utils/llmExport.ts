@@ -1,6 +1,6 @@
 import { db } from '@/db/db'
 import type { Account, Transaction } from '@/db/types'
-import { getPaycycleDateRange } from '@/lib/utils'
+import { getPaycycleDateRange, dateToYMD } from '@/lib/utils'
 
 // ─── LLM-friendly export ──────────────────────────────────────────────────────
 // Produces a structured Markdown document that can be pasted directly into any
@@ -102,11 +102,11 @@ export async function buildLLMExport(): Promise<string> {
       const day = now2.getDay()
       const start = new Date(now2); start.setDate(now2.getDate() - day)
       const end   = new Date(start); end.setDate(start.getDate() + 6)
-      startStr = start.toISOString().split('T')[0]
-      endStr   = end.toISOString().split('T')[0]
+      startStr = dateToYMD(start)
+      endStr   = dateToYMD(end)
     } else {
-      startStr = new Date(now2.getFullYear(), 0, 1).toISOString().split('T')[0]
-      endStr   = new Date(now2.getFullYear(), 11, 31).toISOString().split('T')[0]
+      startStr = dateToYMD(new Date(now2.getFullYear(), 0, 1))
+      endStr   = dateToYMD(new Date(now2.getFullYear(), 11, 31))
     }
     const spent = txs
       .filter((t) => t.type === 'expense' && t.date >= startStr && t.date <= endStr

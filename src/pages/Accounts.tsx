@@ -10,7 +10,7 @@ import { AmountInput } from '@/components/ui/amount-input'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useStagingStore } from '@/store/stagingStore'
 import { useSettings } from '@/hooks/useSettings'
-import { formatCurrency, evalAmount } from '@/lib/utils'
+import { formatCurrency, evalAmount, todayYMD } from '@/lib/utils'
 import { toast } from '@/hooks/useToast'
 import type { AccountType, AccountWithBalance } from '@/db/types'
 
@@ -203,7 +203,7 @@ function TransferDialog({ open, onClose }: { open: boolean; onClose: () => void 
       accountId: Number(form.fromId),
       toAccountId: Number(form.toId),
       amount: evalAmount(form.amount) ?? parseFloat(form.amount),
-      date: new Date().toISOString().split('T')[0],
+      date: todayYMD(),
       description: form.description || 'Transfer',
       tags: form.tags ? form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) : [],
       transferFee: form.fee ? (evalAmount(form.fee) ?? parseFloat(form.fee)) : undefined,
