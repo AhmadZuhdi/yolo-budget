@@ -291,7 +291,7 @@ export function TerminalInput() {
           <div
             ref={mirrorRef}
             aria-hidden="true"
-            className="absolute inset-0 flex items-start px-3 py-2.5 pointer-events-none select-none overflow-hidden font-mono text-sm whitespace-pre-wrap break-all bg-transparent leading-5"
+            className="absolute inset-0 px-3 py-2.5 pointer-events-none select-none font-mono text-sm whitespace-pre-wrap break-words bg-transparent leading-5 overflow-hidden"
           >
             {value === '' ? null : tokens.map((tok, i) => (
               <span key={i} style={{ color: tok.color }}>{tok.text}</span>
