@@ -279,13 +279,13 @@ export default function Transactions() {
                                 className="w-1.5 h-1.5 rounded-full shrink-0"
                                 style={{ backgroundColor: account?.color ?? '#6366f1' }}
                               />
-                              {account?.name}
+                              {account?.name ?? '…'}
                               <ArrowRight className="h-2.5 w-2.5" />
                               <span
                                 className="w-1.5 h-1.5 rounded-full shrink-0"
                                 style={{ backgroundColor: toAccount?.color ?? '#6366f1' }}
                               />
-                              {toAccount?.name}
+                              {toAccount?.name ?? '…'}
                             </span>
                           ) : (
                             <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -293,7 +293,7 @@ export default function Transactions() {
                                 className="w-1.5 h-1.5 rounded-full shrink-0"
                                 style={{ backgroundColor: account?.color ?? '#6366f1' }}
                               />
-                              {account?.name}
+                              {account?.name ?? '…'}
                             </span>
                           )}
                           {tx.tags.map((tag) => (
