@@ -67,14 +67,9 @@ export function formatDateShort(date: Date | string): string {
  * If today >= paycycleDay:  start = this month's paycycleDay,  end = next month's paycycleDay - 1
  * If today <  paycycleDay:  start = last month's paycycleDay,  end = this month's paycycleDay - 1
  *
- * Clamps the day to the last day of the month (handles Feb, 30-day months).
+ * No day-clamping — JS Date handles month overflow naturally.
  */
 export function getPaycycleDateRange(paycycleDay: number): { start: string; end: string } {
-  function clampDay(year: number, month: number, day: number): Date {
-    const lastDay = new Date(year, month + 1, 0).getDate()
-    return new Date(year, month, Math.min(day, lastDay))
-  }
-
   function toYMD(d: Date): string {
     const y = d.getFullYear()
     const m = String(d.getMonth() + 1).padStart(2, '0')
@@ -88,18 +83,12 @@ export function getPaycycleDateRange(paycycleDay: number): { start: string; end:
   const today = now.getDate()
 
   if (today >= paycycleDay) {
-    // cycle start: this month's paycycleDay
-    // cycle end:   next month's paycycleDay - 1
-    const start = clampDay(y, m, paycycleDay)
-    const endRaw = clampDay(y, m + 1, paycycleDay)
-    const end = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate() - 1)
+    const start = new Date(y, m, paycycleDay)
+    const end   = new Date(y, m + 1, paycycleDay - 1)
     return { start: toYMD(start), end: toYMD(end) }
   } else {
-    // cycle start: last month's paycycleDay
-    // cycle end:   this month's paycycleDay - 1
-    const start = clampDay(y, m - 1, paycycleDay)
-    const endRaw = clampDay(y, m, paycycleDay)
-    const end = new Date(endRaw.getFullYear(), endRaw.getMonth(), endRaw.getDate() - 1)
+    const start = new Date(y, m - 1, paycycleDay)
+    const end   = new Date(y, m, paycycleDay - 1)
     return { start: toYMD(start), end: toYMD(end) }
   }
 }

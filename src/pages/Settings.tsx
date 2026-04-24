@@ -341,10 +341,10 @@ export default function Settings() {
               <Input
                 type="number"
                 min={1}
-                max={28}
+                max={31}
                 value={payday}
                 onChange={(e) => {
-                  const v = Math.min(28, Math.max(1, parseInt(e.target.value, 10) || 1))
+                  const v = Math.min(31, Math.max(1, parseInt(e.target.value, 10) || 1))
                   setPayday(v)
                 }}
                 className="w-24"
@@ -357,7 +357,7 @@ export default function Settings() {
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Capped at 28 to work in all months.
+              Day of month your paycheck arrives.
             </p>
           </div>
         </CardContent>

@@ -2,12 +2,13 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/db'
 import type { Budget, BudgetWithSpending } from '@/db/types'
 import { getTagSpending } from './useTransactions'
+import { useSettings } from './useSettings'
 
 export function useBudgets() {
+  const { paycycleDay } = useSettings()
+
   const budgetsWithSpending = useLiveQuery(async (): Promise<BudgetWithSpending[]> => {
     const budgets = await db.budgets.orderBy('createdAt').toArray()
-    const paycycleSetting = await db.settings.get('paycycleDay')
-    const paycycleDay = paycycleSetting ? parseInt(paycycleSetting.value, 10) : 1
 
     return Promise.all(
       budgets.map(async (budget) => {
@@ -20,7 +21,7 @@ export function useBudgets() {
         return { ...budget, spent, percentage, status }
       })
     )
-  }, [])
+  }, [paycycleDay])
 
   async function addBudget(data: Omit<Budget, 'id' | 'createdAt'>) {
     return db.budgets.add({ ...data, createdAt: new Date().toISOString() })
