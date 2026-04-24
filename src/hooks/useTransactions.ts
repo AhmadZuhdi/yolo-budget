@@ -137,23 +137,29 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
 // Convenience: get spending for a set of tags in a given period
 export async function getTagSpending(
   tags: string[],
-  period: 'weekly' | 'monthly' | 'yearly'
+  period: 'weekly' | 'monthly' | 'yearly',
+  paycycleDay = 1
 ): Promise<number> {
   const now = new Date()
   let start: string
+  let end: string = now.toISOString().split('T')[0]
+
   switch (period) {
     case 'weekly':
       start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
         .toISOString().split('T')[0]
       break
-    case 'monthly':
-      start = startOfMonth(now).toISOString().split('T')[0]
+    case 'monthly': {
+      // Use paycycle range instead of calendar month
+      const range = getPaycycleDateRange(paycycleDay)
+      start = range.start
+      end   = range.end
       break
+    }
     case 'yearly':
       start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
       break
   }
-  const end = now.toISOString().split('T')[0]
 
   const txs = await db.transactions
     .where('date')

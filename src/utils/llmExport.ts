@@ -1,5 +1,6 @@
 import { db } from '@/db/db'
 import type { Account, Transaction } from '@/db/types'
+import { getPaycycleDateRange } from '@/lib/utils'
 
 // ─── LLM-friendly export ──────────────────────────────────────────────────────
 // Produces a structured Markdown document that can be pasted directly into any
@@ -87,22 +88,26 @@ export async function buildLLMExport(): Promise<string> {
   const tagRows = Array.from(tagMap.entries()).sort((a, b) => b[1] - a[1])
 
   // ── Budget status ──────────────────────────────────────────────────────────
+  const paycycleSetting = await db.settings.get('paycycleDay')
+  const paycycleDay = paycycleSetting ? parseInt(paycycleSetting.value, 10) : 1
+
   const budgetRows = budgets.map((b) => {
     const now2 = new Date()
-    let start: Date, end: Date
+    let startStr: string, endStr: string
     if (b.period === 'monthly') {
-      start = new Date(now2.getFullYear(), now2.getMonth(), 1)
-      end   = new Date(now2.getFullYear(), now2.getMonth() + 1, 0)
+      const range = getPaycycleDateRange(paycycleDay)
+      startStr = range.start
+      endStr   = range.end
     } else if (b.period === 'weekly') {
       const day = now2.getDay()
-      start = new Date(now2); start.setDate(now2.getDate() - day)
-      end   = new Date(start); end.setDate(start.getDate() + 6)
+      const start = new Date(now2); start.setDate(now2.getDate() - day)
+      const end   = new Date(start); end.setDate(start.getDate() + 6)
+      startStr = start.toISOString().split('T')[0]
+      endStr   = end.toISOString().split('T')[0]
     } else {
-      start = new Date(now2.getFullYear(), 0, 1)
-      end   = new Date(now2.getFullYear(), 11, 31)
+      startStr = new Date(now2.getFullYear(), 0, 1).toISOString().split('T')[0]
+      endStr   = new Date(now2.getFullYear(), 11, 31).toISOString().split('T')[0]
     }
-    const startStr = start.toISOString().split('T')[0]
-    const endStr   = end.toISOString().split('T')[0]
     const spent = txs
       .filter((t) => t.type === 'expense' && t.date >= startStr && t.date <= endStr
         && b.targetTags.some((tag) => t.tags.includes(tag)))

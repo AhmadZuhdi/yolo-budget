@@ -6,9 +6,12 @@ import { getTagSpending } from './useTransactions'
 export function useBudgets() {
   const budgetsWithSpending = useLiveQuery(async (): Promise<BudgetWithSpending[]> => {
     const budgets = await db.budgets.orderBy('createdAt').toArray()
+    const paycycleSetting = await db.settings.get('paycycleDay')
+    const paycycleDay = paycycleSetting ? parseInt(paycycleSetting.value, 10) : 1
+
     return Promise.all(
       budgets.map(async (budget) => {
-        const spent = await getTagSpending(budget.targetTags, budget.period)
+        const spent = await getTagSpending(budget.targetTags, budget.period, paycycleDay)
         const percentage = budget.limitAmount > 0
           ? Math.min((spent / budget.limitAmount) * 100, 999)
           : 0
