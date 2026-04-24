@@ -273,11 +273,29 @@ export default function Transactions() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium break-words">{tx.description}</p>
                         <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                          <span className="text-xs text-muted-foreground">
-                            {tx.type === 'transfer'
-                              ? `${account?.name} → ${toAccount?.name}`
-                              : account?.name}
-                          </span>
+                          {tx.type === 'transfer' ? (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <span
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: account?.color ?? '#6366f1' }}
+                              />
+                              {account?.name}
+                              <ArrowRight className="h-2.5 w-2.5" />
+                              <span
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: toAccount?.color ?? '#6366f1' }}
+                              />
+                              {toAccount?.name}
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                              <span
+                                className="w-1.5 h-1.5 rounded-full shrink-0"
+                                style={{ backgroundColor: account?.color ?? '#6366f1' }}
+                              />
+                              {account?.name}
+                            </span>
+                          )}
                           {tx.tags.map((tag) => (
                             <Badge key={tag} variant="tag" className="text-[10px] px-1.5 py-0">
                               {tag}
