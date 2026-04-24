@@ -4,6 +4,14 @@ import type { Transaction } from '@/db/types'
 import { startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { getPaycycleDateRange } from '@/lib/utils'
 
+// Local-time YYYY-MM-DD — avoids UTC offset shifting the date
+function toYMD(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 export interface TransactionFilters {
   accountId?: number
   type?: Transaction['type']
@@ -56,8 +64,8 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
   // Current month cash flow (excludes transfers)
   const monthlyFlow = useLiveQuery(async () => {
     const now = new Date()
-    const start = startOfMonth(now).toISOString().split('T')[0]
-    const end = endOfMonth(now).toISOString().split('T')[0]
+    const start = toYMD(startOfMonth(now))
+    const end   = toYMD(endOfMonth(now))
 
     const txs = await db.transactions
       .where('date')
@@ -142,12 +150,11 @@ export async function getTagSpending(
 ): Promise<number> {
   const now = new Date()
   let start: string
-  let end: string = now.toISOString().split('T')[0]
+  let end: string = toYMD(now)
 
   switch (period) {
     case 'weekly':
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay())
-        .toISOString().split('T')[0]
+      start = toYMD(new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()))
       break
     case 'monthly': {
       // Use paycycle range instead of calendar month
@@ -157,7 +164,7 @@ export async function getTagSpending(
       break
     }
     case 'yearly':
-      start = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
+      start = toYMD(new Date(now.getFullYear(), 0, 1))
       break
   }
 
