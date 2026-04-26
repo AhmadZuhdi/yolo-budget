@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Plus, RefreshCw, Trash2, Pencil } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,7 @@ import { useAccounts } from '@/hooks/useAccounts'
 import { useSettings } from '@/hooks/useSettings'
 import { formatCurrency, formatDate, evalAmount } from '@/lib/utils'
 import { toast } from '@/hooks/useToast'
-import type { RecurringFrequency, TransactionType } from '@/db/types'
+import type { Recurring, RecurringFrequency, TransactionType } from '@/db/types'
 
 function AddRecurringDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { addRecurring } = useRecurring()
@@ -118,11 +118,127 @@ function AddRecurringDialog({ open, onClose }: { open: boolean; onClose: () => v
   )
 }
 
+function EditRecurringDialog({ recurring, open, onClose }: { recurring: Recurring | null; open: boolean; onClose: () => void }) {
+  const { updateRecurring } = useRecurring()
+  const { accounts } = useAccounts()
+  const [form, setForm] = useState({
+    description: '',
+    amount: '',
+    type: 'expense' as TransactionType,
+    accountId: '',
+    frequency: 'monthly' as RecurringFrequency,
+    tags: '',
+  })
+
+  // Populate form when a recurring entry is passed in
+  useEffect(() => {
+    if (recurring) {
+      setForm({
+        description: recurring.templateTransaction.description,
+        amount: String(recurring.templateTransaction.amount),
+        type: recurring.templateTransaction.type as TransactionType,
+        accountId: String(recurring.templateTransaction.accountId),
+        frequency: recurring.frequency,
+        tags: recurring.templateTransaction.tags.join(', '),
+      })
+    }
+  }, [recurring?.id])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!recurring?.id || !form.description || !form.amount || !form.accountId) return
+    await updateRecurring(recurring.id, {
+      frequency: form.frequency,
+      templateTransaction: {
+        ...recurring.templateTransaction,
+        accountId: Number(form.accountId),
+        type: form.type,
+        amount: evalAmount(form.amount) ?? parseFloat(form.amount),
+        description: form.description,
+        tags: form.tags ? form.tags.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean) : [],
+      },
+    })
+    toast.success('Recurring updated', `"${form.description}" saved.`)
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Recurring Transaction</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label>Description</Label>
+            <Input value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="e.g. Netflix Subscription" autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Amount</Label>
+              <AmountInput value={form.amount}
+                onChange={(v) => setForm((f) => ({ ...f, amount: v }))} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v as TransactionType }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="income">Income</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label>Account</Label>
+              <Select value={form.accountId} onValueChange={(v) => setForm((f) => ({ ...f, accountId: v }))}>
+                <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Frequency</Label>
+              <Select value={form.frequency} onValueChange={(v) => setForm((f) => ({ ...f, frequency: v as RecurringFrequency }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label>Tags (comma separated)</Label>
+            <Input value={form.tags}
+              onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+              placeholder="subscription, entertainment" />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="submit">Save</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function Recurring() {
   const { recurring, deleteRecurring, toggleActive } = useRecurring()
   const { accounts } = useAccounts()
   const { currency } = useSettings()
   const [showAdd, setShowAdd] = useState(false)
+  const [editingRecurring, setEditingRecurring] = useState<Recurring | null>(null)
 
   function getAccount(id: number) {
     return accounts.find((a) => a.id === id)
@@ -198,6 +314,13 @@ export default function Recurring() {
                       aria-label="Toggle active"
                     />
                     <button
+                      onClick={() => setEditingRecurring(r)}
+                      className="p-1.5 rounded text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                      aria-label="Edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
                       onClick={async () => {
                         await deleteRecurring(r.id!)
                         toast.warning('Deleted', `"${description}" recurring removed.`)
@@ -216,6 +339,12 @@ export default function Recurring() {
       )}
 
       <AddRecurringDialog open={showAdd} onClose={() => setShowAdd(false)} />
+
+      <EditRecurringDialog
+        recurring={editingRecurring}
+        open={editingRecurring !== null}
+        onClose={() => setEditingRecurring(null)}
+      />
     </div>
   )
 }
