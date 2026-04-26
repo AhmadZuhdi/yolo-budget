@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, ArrowRight, Filter, X, Scale, Trash2, Pencil } from 'lucide-react'
+import { TrendingUp, TrendingDown, ArrowRight, Filter, X, Scale, Trash2, Pencil, Repeat } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +12,7 @@ import { formatCurrency, formatDate, getPaycycleDateRange } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { ReconcileDialog } from '@/components/transactions/ReconcileDialog'
 import { EditTransactionDialog } from '@/components/transactions/EditTransactionDialog'
+import { CreateRecurringDialog } from '@/components/transactions/CreateRecurringDialog'
 import { toast } from '@/hooks/useToast'
 import type { Transaction } from '@/db/types'
 
@@ -31,6 +32,7 @@ export default function Transactions() {
   const [showReconcile, setShowReconcile] = useState(false)
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [editingTx, setEditingTx] = useState<Transaction | null>(null)
+  const [recurringTx, setRecurringTx] = useState<Transaction | null>(null)
   const [payCycleActive, setPayCycleActive] = useState(false)
 
   const { transactions, allTags, deleteTransaction } = useTransactions({ ...filters, tags: selectedTags.length > 0 ? selectedTags : undefined })
@@ -115,6 +117,12 @@ export default function Transactions() {
         transaction={editingTx}
         open={editingTx !== null}
         onOpenChange={(open) => { if (!open) setEditingTx(null) }}
+      />
+
+      <CreateRecurringDialog
+        transaction={recurringTx}
+        open={recurringTx !== null}
+        onClose={() => setRecurringTx(null)}
       />
 
       {/* Filter panel */}
@@ -312,6 +320,14 @@ export default function Transactions() {
                         {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}
                         {formatCurrency(tx.amount, currency)}
                       </span>
+
+                      <button
+                        onClick={() => setRecurringTx(tx)}
+                        className="shrink-0 p-1.5 rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 focus:opacity-100 hover:text-violet-400 hover:bg-violet-500/10 transition-all"
+                        aria-label="Create recurring"
+                      >
+                        <Repeat className="h-3.5 w-3.5" />
+                      </button>
 
                       <button
                         onClick={() => setEditingTx(tx)}
