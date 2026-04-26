@@ -8,9 +8,11 @@ import { useStagingStore } from '@/store/stagingStore'
 const MASK = '••••••'
 
 export function NetWorthCard() {
-  const { netWorth, accountsWithBalance } = useAccounts()
+  const { netWorth, liquidAccounts, nonLiquidAccounts, liquidNetWorth, nonLiquidNetWorth } = useAccounts()
   const { currency } = useSettings()
   const { hideAmounts, toggleHideAmounts } = useStagingStore()
+
+  const hasBothGroups = liquidAccounts.length > 0 && nonLiquidAccounts.length > 0
 
   return (
     <Card className="bg-gradient-to-br from-primary/10 via-card to-card border-primary/20">
@@ -34,15 +36,57 @@ export function NetWorthCard() {
           {hideAmounts ? MASK : formatCurrency(netWorth, currency)}
         </p>
 
-        {accountsWithBalance.length > 0 && (
+        {hasBothGroups ? (
+          <div className="mt-3 space-y-3">
+            {/* Liquid group */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Liquid</span>
+                <span className="text-xs font-semibold text-foreground">
+                  {hideAmounts ? MASK : formatCurrency(liquidNetWorth, currency)}
+                </span>
+              </div>
+              {liquidAccounts.map((acc) => (
+                <div key={acc.id} className="flex items-center justify-between text-sm pl-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                    <span className="text-muted-foreground truncate max-w-[120px]">{acc.name}</span>
+                  </div>
+                  <span className={acc.balance < 0 ? 'text-red-400' : 'text-foreground'}>
+                    {hideAmounts ? MASK : formatCurrency(acc.balance, currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Non-liquid group */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Non-Liquid</span>
+                <span className="text-xs font-semibold text-foreground">
+                  {hideAmounts ? MASK : formatCurrency(nonLiquidNetWorth, currency)}
+                </span>
+              </div>
+              {nonLiquidAccounts.map((acc) => (
+                <div key={acc.id} className="flex items-center justify-between text-sm pl-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
+                    <span className="text-muted-foreground truncate max-w-[120px]">{acc.name}</span>
+                  </div>
+                  <span className={acc.balance < 0 ? 'text-red-400' : 'text-foreground'}>
+                    {hideAmounts ? MASK : formatCurrency(acc.balance, currency)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          /* Single group — flat list (original behaviour) */
           <div className="mt-3 space-y-1.5">
-            {accountsWithBalance.map((acc) => (
+            {[...liquidAccounts, ...nonLiquidAccounts].map((acc) => (
               <div key={acc.id} className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ backgroundColor: acc.color }}
-                  />
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: acc.color }} />
                   <span className="text-muted-foreground truncate max-w-[120px]">{acc.name}</span>
                 </div>
                 <span className={acc.balance < 0 ? 'text-red-400' : 'text-foreground'}>

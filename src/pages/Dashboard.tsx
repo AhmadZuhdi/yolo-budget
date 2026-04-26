@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { NetWorthCard } from '@/components/dashboard/NetWorthCard'
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions'
+import { SavingsCard } from '@/components/dashboard/SavingsCard'
 import { useTransactions } from '@/hooks/useTransactions'
 import { useBudgets } from '@/hooks/useBudgets'
 import { useSettings } from '@/hooks/useSettings'
@@ -174,6 +175,7 @@ export default function Dashboard() {
       </div>
 
       <NetWorthCard />
+      <SavingsCard />
       <CashFlowCard />
       <BudgetOverview />
       <ExpenseByTag />

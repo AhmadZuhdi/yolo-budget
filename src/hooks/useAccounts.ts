@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, computeAccountBalance } from '@/db/db'
 import type { Account, AccountWithBalance } from '@/db/types'
 
+const LIQUID_TYPES: Account['type'][] = ['cash', 'bank', 'credit_card', 'other']
+
 export function useAccounts() {
   const accounts = useLiveQuery(() => db.accounts.orderBy('createdAt').toArray(), [])
 
@@ -16,6 +18,12 @@ export function useAccounts() {
   }, [])
 
   const netWorth = accountsWithBalance?.reduce((sum, a) => sum + a.balance, 0) ?? 0
+
+  const liquidAccounts = (accountsWithBalance ?? []).filter((a) => LIQUID_TYPES.includes(a.type))
+  const nonLiquidAccounts = (accountsWithBalance ?? []).filter((a) => !LIQUID_TYPES.includes(a.type))
+
+  const liquidNetWorth = liquidAccounts.reduce((sum, a) => sum + a.balance, 0)
+  const nonLiquidNetWorth = nonLiquidAccounts.reduce((sum, a) => sum + a.balance, 0)
 
   async function addAccount(data: Omit<Account, 'id' | 'createdAt'>) {
     return db.accounts.add({ ...data, createdAt: new Date().toISOString() })
@@ -36,6 +44,10 @@ export function useAccounts() {
     accounts: accounts ?? [],
     accountsWithBalance: accountsWithBalance ?? [],
     netWorth,
+    liquidAccounts,
+    nonLiquidAccounts,
+    liquidNetWorth,
+    nonLiquidNetWorth,
     addAccount,
     updateAccount,
     deleteAccount,
