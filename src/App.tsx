@@ -7,6 +7,7 @@ import Accounts from '@/pages/Accounts'
 import Budgets from '@/pages/Budgets'
 import Recurring from '@/pages/Recurring'
 import Settings from '@/pages/Settings'
+import Utilities from '@/pages/Utilities'
 import { seedDefaultData } from '@/db/db'
 import { processRecurringTransactions } from '@/utils/recurringEngine'
 
@@ -32,6 +33,7 @@ export default function App() {
           <Route path="/budgets"      element={<Budgets />} />
           <Route path="/recurring"    element={<Recurring />} />
           <Route path="/settings"     element={<Settings />} />
+          <Route path="/utilities"    element={<Utilities />} />
         </Route>
       </Routes>
     </BrowserRouter>

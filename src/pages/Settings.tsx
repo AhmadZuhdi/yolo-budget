@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Settings as SettingsIcon, Github, Upload, Download, Check, Loader2, Trash2, ChevronDown, Search, Info, CalendarDays, BrainCircuit, Copy, FileText } from 'lucide-react'
+import { Settings as SettingsIcon, Github, Upload, Download, Check, Loader2, Trash2, ChevronDown, Search, Info, CalendarDays, BrainCircuit, Copy, FileText, Wrench } from 'lucide-react'
 import pkg from '../../package.json'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,6 +14,7 @@ import type { GistSyncPayload } from '@/db/types'
 import { formatDate, getPaycycleDateRange, cn } from '@/lib/utils'
 import { db } from '@/db/db'
 import { toast } from '@/hooks/useToast'
+import { Link } from 'react-router-dom'
 
 // Common world currencies with flag emoji
 const CURRENCIES = [
@@ -538,6 +539,24 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+
+      {/* Utilities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wrench className="h-4 w-4" /> Utilities
+          </CardTitle>
+          <CardDescription>Data management tools</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/utilities">
+            <Button variant="outline" className="w-full justify-start gap-2">
+              <Wrench className="h-4 w-4" />
+              Open Utilities
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
 
       {/* Export preview dialog */}
       <ExportPreviewDialog

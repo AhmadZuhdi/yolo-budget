@@ -130,6 +130,19 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
     return Array.from(tagSet).sort()
   }, [])
 
+  async function renameTag(oldTag: string, newTag: string): Promise<number> {
+    const normalised = newTag.trim().toLowerCase()
+    let count = 0
+    await db.transactions
+      .where('tags')
+      .equals(oldTag)
+      .modify((tx) => {
+        tx.tags = tx.tags.map((t) => (t === oldTag ? normalised : t))
+        count++
+      })
+    return count
+  }
+
   return {
     transactions: transactions ?? [],
     monthlyFlow: monthlyFlow ?? { income: 0, expense: 0, net: 0 },
@@ -139,6 +152,7 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
     updateTransaction,
     deleteTransaction,
     commitTransaction,
+    renameTag,
   }
 }
 
