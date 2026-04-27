@@ -18,7 +18,7 @@ function TagRenameCard() {
 
   // All distinct tags from committed transactions
   const allTags = useLiveQuery(async () => {
-    const txs = await db.transactions.where('isCommitted').equals(1).toArray()
+    const txs = await db.transactions.filter(tx => tx.isCommitted === true).toArray()
     const tagSet = new Set<string>()
     txs.forEach((tx) => tx.tags.forEach((t) => tagSet.add(t)))
     return Array.from(tagSet).sort()
