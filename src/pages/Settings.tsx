@@ -291,6 +291,24 @@ export default function Settings() {
         <p className="text-sm text-muted-foreground">Preferences and data sync</p>
       </div>
 
+      {/* Utilities */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wrench className="h-4 w-4" /> Utilities
+          </CardTitle>
+          <CardDescription>Data management tools</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to="/utilities">
+            <Button variant="outline" className="w-full justify-start gap-2">
+              <Wrench className="h-4 w-4" />
+              Open Utilities
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
       {/* About */}
       <Card>
         <CardHeader>
@@ -536,25 +554,6 @@ export default function Settings() {
           >
             Clear all data
           </Button>
-        </CardContent>
-      </Card>
-
-
-      {/* Utilities */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Wrench className="h-4 w-4" /> Utilities
-          </CardTitle>
-          <CardDescription>Data management tools</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Link to="/utilities">
-            <Button variant="outline" className="w-full justify-start gap-2">
-              <Wrench className="h-4 w-4" />
-              Open Utilities
-            </Button>
-          </Link>
         </CardContent>
       </Card>
 
