@@ -130,6 +130,20 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
     return Array.from(tagSet).sort()
   }, [])
 
+  async function mergeTag(source: string, target: string): Promise<number> {
+    const normalised = target.trim().toLowerCase()
+    const txs = await db.transactions
+      .filter((tx) => tx.isCommitted === true && tx.tags.includes(source))
+      .toArray()
+    if (txs.length === 0) return 0
+    const updated = txs.map((tx) => ({
+      ...tx,
+      tags: Array.from(new Set(tx.tags.map((t) => (t === source ? normalised : t)))),
+    }))
+    await db.transactions.bulkPut(updated)
+    return updated.length
+  }
+
   async function renameTag(oldTag: string, newTag: string): Promise<number> {
     const normalised = newTag.trim().toLowerCase()
     let count = 0
@@ -153,6 +167,7 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
     deleteTransaction,
     commitTransaction,
     renameTag,
+    mergeTag,
   }
 }
 
