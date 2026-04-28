@@ -61,16 +61,21 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
     filters.committedOnly,
   ])
 
-  // Current month cash flow (excludes transfers)
+  // Current month cash flow (excludes transfers + savings/investment accounts)
   const monthlyFlow = useLiveQuery(async () => {
     const now = new Date()
     const start = toYMD(startOfMonth(now))
     const end   = toYMD(endOfMonth(now))
 
+    const nonLiquidIds = new Set(
+      (await db.accounts.filter((a) => a.type === 'savings' || a.type === 'investment').toArray())
+        .map((a) => a.id!)
+    )
+
     const txs = await db.transactions
       .where('date')
       .between(start, end, true, true)
-      .and((tx) => tx.isCommitted && tx.type !== 'transfer')
+      .and((tx) => tx.isCommitted && tx.type !== 'transfer' && !nonLiquidIds.has(tx.accountId))
       .toArray()
 
     const income = txs
@@ -84,14 +89,19 @@ export function useTransactions(filters: TransactionFilters = {}, paycycleDay = 
     return { income, expense, net: income - expense }
   }, [])
 
-  // Pay-cycle cash flow (based on configured payday, excludes transfers)
+  // Pay-cycle cash flow (based on configured payday, excludes transfers + savings/investment accounts)
   const paycycleFlow = useLiveQuery(async () => {
     const { start, end } = getPaycycleDateRange(paycycleDay)
+
+    const nonLiquidIds = new Set(
+      (await db.accounts.filter((a) => a.type === 'savings' || a.type === 'investment').toArray())
+        .map((a) => a.id!)
+    )
 
     const txs = await db.transactions
       .where('date')
       .between(start, end, true, true)
-      .and((tx) => tx.isCommitted && tx.type !== 'transfer')
+      .and((tx) => tx.isCommitted && tx.type !== 'transfer' && !nonLiquidIds.has(tx.accountId))
       .toArray()
 
     const income = txs
