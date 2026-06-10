@@ -3,7 +3,7 @@ import type { GistSyncPayload } from '@/db/types'
 
 const GIST_API = 'https://api.github.com/gists'
 const SYNC_FILENAME = 'yolo-expense-tracker-backup.json'
-const PAYLOAD_VERSION = 1
+export const PAYLOAD_VERSION = 1
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
@@ -97,6 +97,34 @@ export async function importFromGist(pat: string, gistId: string): Promise<GistS
 
 // ─── Restore (destructive) ────────────────────────────────────────────────────
 
+function remapAccountIds<T>(
+  records: T[],
+  idMap: Map<number, number>,
+  fieldPaths: string[]
+): T[] {
+  return records.map((record) => {
+    const obj = { ...record as Record<string, unknown> }
+    for (const path of fieldPaths) {
+      const parts = path.split('.')
+      let current: Record<string, unknown> = obj
+      for (let i = 0; i < parts.length - 1; i++) {
+        const nested = current[parts[i]]
+        if (!nested || typeof nested !== 'object') break
+        current = nested as Record<string, unknown>
+      }
+      const lastKey = parts[parts.length - 1]
+      const oldVal = current[lastKey]
+      if (typeof oldVal === 'number') {
+        const newVal = idMap.get(oldVal)
+        if (newVal !== undefined) {
+          current[lastKey] = newVal
+        }
+      }
+    }
+    return obj as T
+  })
+}
+
 export async function restoreFromPayload(payload: GistSyncPayload): Promise<void> {
   // Preserve credentials and user preferences before wiping data tables
   const [savedPat, savedGistId, savedCurrency, savedTheme] = await Promise.all([
@@ -118,11 +146,39 @@ export async function restoreFromPayload(payload: GistSyncPayload): Promise<void
   const strip = <T extends { id?: number }>(items: T[]): Omit<T, 'id'>[] =>
     items.map(({ id: _id, ...rest }) => rest as Omit<T, 'id'>)
 
+  // 1) Capture old account IDs before stripping
+  const oldAccountIds = payload.accounts.map((a) => a.id!)
+
+  // 2) Insert accounts first — capture new auto-assigned IDs
+  const strippedAccounts = strip(payload.accounts)
+  const newAccountIds = await db.accounts.bulkAdd(strippedAccounts, { allKeys: true })
+
+  // 3) Build old→new ID map
+  const idMap = new Map<number, number>()
+  for (let i = 0; i < oldAccountIds.length; i++) {
+    const oldId = oldAccountIds[i]
+    const newId = newAccountIds[i]
+    if (oldId !== undefined && newId !== undefined) {
+      idMap.set(oldId, newId)
+    }
+  }
+
+  // 4) Remap transactions + recurring to new account IDs, then bulk-insert
+  const remappedTransactions = remapAccountIds(
+    payload.transactions,
+    idMap,
+    ['accountId', 'toAccountId']
+  )
+  const remappedRecurring = remapAccountIds(
+    payload.recurring,
+    idMap,
+    ['templateTransaction.accountId', 'templateTransaction.toAccountId']
+  )
+
   await Promise.all([
-    db.accounts.bulkAdd(strip(payload.accounts) as Parameters<typeof db.accounts.bulkAdd>[0]),
-    db.transactions.bulkAdd(strip(payload.transactions) as Parameters<typeof db.transactions.bulkAdd>[0]),
+    db.transactions.bulkAdd(strip(remappedTransactions) as Parameters<typeof db.transactions.bulkAdd>[0]),
+    db.recurring.bulkAdd(strip(remappedRecurring) as Parameters<typeof db.recurring.bulkAdd>[0]),
     db.budgets.bulkAdd(strip(payload.budgets) as Parameters<typeof db.budgets.bulkAdd>[0]),
-    db.recurring.bulkAdd(strip(payload.recurring) as Parameters<typeof db.recurring.bulkAdd>[0]),
   ])
 
   // Re-write preserved settings so they survive the restore

@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { Tags, GitMerge } from 'lucide-react'
+import { Tags, GitMerge, FileDown, FileUp, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { useTransactions } from '@/hooks/useTransactions'
 import { db } from '@/db/db'
 import { toast } from '@/hooks/useToast'
+import { exportToJsonFile, importFromJsonFile } from '@/utils/fileBackup'
+import { restoreFromPayload } from '@/utils/gistSync'
+import type { GistSyncPayload } from '@/db/types'
 
 function TagRenameCard() {
   const { renameTag } = useTransactions()
@@ -217,6 +221,205 @@ function TagMergeCard() {
   )
 }
 
+// ─── Export to JSON ───────────────────────────────────────────────────────────
+
+function ExportJsonCard() {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success'>('idle')
+
+  async function handleExport() {
+    try {
+      setStatus('loading')
+      await exportToJsonFile()
+      setStatus('success')
+      toast.success('Export successful', 'JSON file has been downloaded.')
+      setTimeout(() => setStatus('idle'), 3000)
+    } catch (err) {
+      setStatus('idle')
+      toast.error('Export failed', String(err))
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <FileDown className="h-4 w-4 text-muted-foreground" />
+          Export to JSON
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Download all your data as a JSON file for backup or transfer.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Button
+          onClick={handleExport}
+          disabled={status === 'loading'}
+          variant="outline"
+          className="w-full flex items-center gap-2"
+        >
+          {status === 'loading' ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : status === 'success' ? (
+            <Check className="h-4 w-4 text-emerald-400" />
+          ) : (
+            <FileDown className="h-4 w-4" />
+          )}
+          {status === 'loading' ? 'Exporting…' : status === 'success' ? 'Exported!' : 'Export JSON'}
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ─── Import from JSON ─────────────────────────────────────────────────────────
+
+type ImportState = 'idle' | 'loading' | 'preview' | 'restoring' | 'success'
+
+function ImportJsonCard() {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [state, setState] = useState<ImportState>('idle')
+  const [previewPayload, setPreviewPayload] = useState<GistSyncPayload | null>(null)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  function handleFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setState('loading')
+    setErrorMsg('')
+    importFromJsonFile(file)
+      .then((payload) => {
+        setPreviewPayload(payload)
+        setState('preview')
+      })
+      .catch((err: Error) => {
+        setErrorMsg(err.message)
+        setState('idle')
+        toast.error('Import failed', err.message)
+      })
+      .finally(() => {
+        if (inputRef.current) inputRef.current.value = ''
+      })
+  }
+
+  async function handleConfirm() {
+    if (!previewPayload) return
+    setState('restoring')
+    try {
+      await restoreFromPayload(previewPayload)
+      setState('success')
+      toast.success('Import successful', 'All data has been restored from the file.')
+      setTimeout(() => setState('idle'), 3000)
+    } catch (err) {
+      setState('preview')
+      toast.error('Import failed', String(err))
+    }
+  }
+
+  function handleCancel() {
+    setState('idle')
+    setPreviewPayload(null)
+    setErrorMsg('')
+  }
+
+  const counts = previewPayload
+    ? {
+        accounts: previewPayload.accounts.length,
+        transactions: previewPayload.transactions.length,
+        budgets: previewPayload.budgets.length,
+        recurring: previewPayload.recurring.length,
+      }
+    : null
+
+  return (
+    <>
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <FileUp className="h-4 w-4 text-muted-foreground" />
+            Import from JSON
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Restore data from a previously exported JSON file. This will replace all existing data.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".json"
+            onChange={handleFilePicked}
+            className="hidden"
+          />
+          <Button
+            onClick={() => inputRef.current?.click()}
+            disabled={state === 'loading' || state === 'restoring'}
+            variant="outline"
+            className="w-full flex items-center gap-2"
+          >
+            {state === 'loading' || state === 'restoring' ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : state === 'success' ? (
+              <Check className="h-4 w-4 text-emerald-400" />
+            ) : (
+              <FileUp className="h-4 w-4" />
+            )}
+            {state === 'loading' ? 'Reading file…' : state === 'restoring' ? 'Restoring…' : state === 'success' ? 'Imported!' : 'Select JSON file'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Import preview dialog */}
+      <Dialog open={state === 'preview'} onOpenChange={(v) => { if (!v) handleCancel() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              Review before importing
+            </DialogTitle>
+            <DialogDescription>
+              This will permanently replace all your existing data with the data from the file.
+            </DialogDescription>
+          </DialogHeader>
+
+          {counts && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-md bg-secondary/50 px-3 py-2 text-center">
+                <p className="text-lg font-bold">{counts.accounts}</p>
+                <p className="text-xs text-muted-foreground">accounts</p>
+              </div>
+              <div className="rounded-md bg-secondary/50 px-3 py-2 text-center">
+                <p className="text-lg font-bold">{counts.transactions}</p>
+                <p className="text-xs text-muted-foreground">transactions</p>
+              </div>
+              <div className="rounded-md bg-secondary/50 px-3 py-2 text-center">
+                <p className="text-lg font-bold">{counts.budgets}</p>
+                <p className="text-xs text-muted-foreground">budgets</p>
+              </div>
+              <div className="rounded-md bg-secondary/50 px-3 py-2 text-center">
+                <p className="text-lg font-bold">{counts.recurring}</p>
+                <p className="text-xs text-muted-foreground">recurring</p>
+              </div>
+            </div>
+          )}
+
+          {errorMsg && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+              {errorMsg}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCancel}>Cancel</Button>
+            <Button variant="destructive" onClick={handleConfirm}>
+              Yes, overwrite with file
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
 export default function Utilities() {  return (
     <div className="p-4 space-y-4 max-w-2xl mx-auto md:p-6">
       <div className="pt-2">
@@ -226,6 +429,8 @@ export default function Utilities() {  return (
 
       <TagRenameCard />
       <TagMergeCard />
+      <ExportJsonCard />
+      <ImportJsonCard />
     </div>
   )
 }
