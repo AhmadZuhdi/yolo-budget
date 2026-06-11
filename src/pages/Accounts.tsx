@@ -337,24 +337,24 @@ export default function Accounts() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 ml-2">
-                      <span className={`text-lg font-bold ${acc.balance < 0 ? 'text-red-400' : 'text-foreground'}`}>
-                        {formatCurrency(acc.balance, currency)}
-                      </span>
-                      <button
-                        onClick={() => setEditTarget(acc)}
-                        className="p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100"
-                        aria-label="Edit account"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget(acc)}
-                        className="p-1.5 rounded text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                        aria-label="Delete account"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <span className={`text-lg font-bold ${acc.balance < 0 ? 'text-red-400' : 'text-foreground'}`}>
+                          {formatCurrency(acc.balance, currency)}
+                        </span>
+                        <button
+                          onClick={() => setEditTarget(acc)}
+                          className="p-1.5 rounded text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100"
+                          aria-label="Edit account"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget(acc)}
+                          className="p-1.5 rounded text-muted-foreground hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                          aria-label="Delete account"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                     </div>
                   </div>
                 </CardContent>

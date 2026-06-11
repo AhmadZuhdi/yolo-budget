@@ -147,11 +147,8 @@ export function parseTerminalInput(input: string): ParsedTerminalInput | null {
   const tagMatches = trimmed.match(/#[\w-]+/g) ?? []
   result.tags = tagMatches.map((t) => t.slice(1).toLowerCase())
 
-  // Extract accounts (@word or @multi word — up to next @ or # or end)
-  const accountMatches = trimmed.match(/@([\w\s]+?)(?=\s+[@#]|\s+to\s+|fee:|$)/gi) ?? []
-  const accounts = accountMatches.map((a) =>
-    a.replace(/^@/, '').replace(/\s+to\s+.*/i, '').trim()
-  )
+  // Extract accounts (@word — word characters only, no spaces)
+  const accounts = Array.from(trimmed.matchAll(/@([\w-]+)/g), (m) => m[1])
 
   // Extract fee
   const feeMatch = trimmed.match(/fee:([\d.]+)/i)

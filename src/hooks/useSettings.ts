@@ -22,6 +22,8 @@ export function useSettings() {
     return db.settings.delete(key)
   }
 
+  
+
   return {
     settings: settingsMap,
     getSetting,

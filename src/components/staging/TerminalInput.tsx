@@ -3,7 +3,9 @@ import { useStagingStore, parseTerminalInput } from '@/store/stagingStore'
 import { useAccounts } from '@/hooks/useAccounts'
 import { useTransactions } from '@/hooks/useTransactions'
 import { cn, todayYMD } from '@/lib/utils'
-import { CornerDownLeft, Terminal } from 'lucide-react'
+import { CornerDownLeft, Terminal, CalendarDays } from 'lucide-react'
+import { Separator } from '@/components/ui/separator'
+import { InlineCalendar } from './InlineCalendar'
 
 const HINTS = [
   '-50 Coffee #food @Cash',
@@ -81,8 +83,14 @@ function tokenize(value: string): Token[] {
 }
 
 // ── Active token detection (for autocomplete) ────────────────────────────────
-function getActiveToken(value: string, cursorPos: number): { type: '@' | '#' | null; partial: string; tokenStart: number } {
+type TokenType = '@' | '#' | 'd:' | null
+function getActiveToken(value: string, cursorPos: number): { type: TokenType; partial: string; tokenStart: number } {
   const before = value.slice(0, cursorPos)
+  const dMatch = before.match(/(?:^|\s)(d:)(\S*)$/)
+  if (dMatch) {
+    const tokenStart = before.lastIndexOf(dMatch[0]) + (dMatch[0].startsWith(' ') || dMatch[0].startsWith('\t') ? 1 : 0)
+    return { type: 'd:', partial: dMatch[2], tokenStart }
+  }
   const match = before.match(/(?:^|\s)([@#])(\S*)$/)
   if (!match) return { type: null, partial: '', tokenStart: -1 }
   const prefix = match[1] as '@' | '#'
@@ -97,7 +105,7 @@ export function TerminalInput() {
   const [hint, setHint] = useState(HINTS[0])
   const [error, setError] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
-  const [suggestionType, setSuggestionType] = useState<'@' | '#' | null>(null)
+  const [suggestionType, setSuggestionType] = useState<TokenType>(null)
   const [activeIdx, setActiveIdx] = useState(0)
   const [tokenStart, setTokenStart] = useState(-1)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -106,6 +114,27 @@ export function TerminalInput() {
   const { addToStaging } = useStagingStore()
   const { accounts } = useAccounts()
   const { allTags } = useTransactions()
+
+  // Terminal-local pinned account (not global). Persist to localStorage under key 'terminalPinnedAccountId'
+  const STORAGE_KEY = 'terminalPinnedAccountId'
+  const [pinnedAccountId, setPinnedAccountId] = useState<number | null>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      return raw ? parseInt(raw, 10) : null
+    } catch (e) {
+      return null
+    }
+  })
+  const [pinMenuOpen, setPinMenuOpen] = useState(false)
+
+  useEffect(() => {
+    try {
+      if (pinnedAccountId === null) localStorage.removeItem(STORAGE_KEY)
+      else localStorage.setItem(STORAGE_KEY, String(pinnedAccountId))
+    } catch (e) {
+      // ignore
+    }
+  }, [pinnedAccountId])
 
   // Rotate hints
   useEffect(() => {
@@ -117,6 +146,11 @@ export function TerminalInput() {
     }, 3000)
     return () => clearInterval(i)
   }, [])
+
+  const DATE_PRESETS = [
+    'today', 'yesterday',
+    ...Array.from({ length: 30 }, (_, i) => `-${i + 1}`),
+  ]
 
   const computeSuggestions = useCallback(
     (val: string, cursor: number) => {
@@ -133,9 +167,14 @@ export function TerminalInput() {
           .map((a) => a.name)
           .filter((n) => n.toLowerCase().startsWith(lower) && n.toLowerCase() !== lower)
         setSuggestions(matches.slice(0, 6))
-      } else {
+        setSuggestionType(type)
+      } else if (type === '#') {
         const matches = allTags.filter((t) => t.startsWith(lower) && t !== lower)
         setSuggestions(matches.slice(0, 6))
+        setSuggestionType(type)
+      } else if (type === 'd:') {
+        const matches = DATE_PRESETS.filter((p) => p.startsWith(lower) && p !== lower)
+        setSuggestions(matches)
       }
       setSuggestionType(type)
       setTokenStart(ts)
@@ -160,17 +199,18 @@ export function TerminalInput() {
   }
 
   function applySuggestion(suggestion: string) {
-    if (!inputRef.current) return
+    if (!inputRef.current || !suggestionType) return
     const cursor = inputRef.current.selectionStart ?? value.length
     const { partial } = getActiveToken(value, cursor)
+    const prefixLen = suggestionType.length
     const beforeToken = value.slice(0, tokenStart)
-    const afterCursor = value.slice(tokenStart + 1 + partial.length)
+    const afterCursor = value.slice(tokenStart + prefixLen + partial.length)
     const newVal = beforeToken + suggestionType + suggestion + (afterCursor.startsWith(' ') ? '' : ' ') + afterCursor
     setValue(newVal)
     setSuggestions([])
     setSuggestionType(null)
     setTimeout(() => {
-      const pos = beforeToken.length + 1 + suggestion.length + 1
+      const pos = beforeToken.length + prefixLen + suggestion.length + 1
       inputRef.current?.focus()
       inputRef.current?.setSelectionRange(pos, pos)
     }, 0)
@@ -202,10 +242,32 @@ export function TerminalInput() {
     }
   }
 
-  function resolveAccountId(name?: string): number | undefined {
-    if (!name) return accounts[0]?.id
-    const match = accounts.find((a) => a.name.toLowerCase() === name.toLowerCase())
-    return match?.id ?? accounts[0]?.id
+  function handleDateSelect(ymd: string) {
+    if (!inputRef.current) return
+    const cursor = inputRef.current.selectionStart ?? value.length
+    const { partial } = getActiveToken(value, cursor)
+    const prefixLen = 2 // 'd:'
+    const beforeToken = value.slice(0, tokenStart)
+    const afterCursor = value.slice(tokenStart + prefixLen + partial.length)
+    const newVal = beforeToken + 'd:' + ymd + (afterCursor.startsWith(' ') ? '' : ' ') + afterCursor
+    setValue(newVal)
+    setSuggestions([])
+    setSuggestionType(null)
+    setTimeout(() => {
+      const pos = beforeToken.length + prefixLen + ymd.length + 1
+      inputRef.current?.focus()
+      inputRef.current?.setSelectionRange(pos, pos)
+    }, 0)
+  }
+
+  function resolveAccountId(name?: string, allowFallback = true): number | undefined {
+    if (!name) return allowFallback ? accounts[0]?.id : undefined
+    const lower = name.toLowerCase()
+    const exact = accounts.find((a) => a.name.toLowerCase() === lower)
+    if (exact) return exact.id
+    const prefix = accounts.find((a) => a.name.toLowerCase().startsWith(lower + ' '))
+    if (prefix) return prefix.id
+    return allowFallback ? accounts[0]?.id : undefined
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -218,20 +280,44 @@ export function TerminalInput() {
     if (parsed.error) { setError(parsed.error); return }
     if (!parsed.amount || parsed.amount <= 0) { setError('Amount must be > 0'); return }
 
-    const accountId = resolveAccountId(parsed.accountName)
+    // Determine accountId, preferring pinnedAccountId when appropriate
+    let accountId: number | undefined
+    // If parsed specifies an account name, resolve it normally
+    if (parsed.accountName) {
+      accountId = resolveAccountId(parsed.accountName)
+    } else if (pinnedAccountId) {
+      // Use pinned account if present and exists
+      const pinned = accounts.find((a) => a.id === pinnedAccountId)
+      if (pinned) {
+        accountId = pinned.id
+      } else {
+        // pinnedAccountId set but account missing — clear local pin
+        setPinnedAccountId(null)
+      }
+    }
+
+    // Fallback to first account if still undefined
+    if (!accountId) accountId = resolveAccountId(parsed.accountName)
     if (!accountId) { setError('No accounts found. Create one first.'); return }
 
     const today = todayYMD()
 
     if (parsed.type === 'transfer') {
-      const toAccountId = resolveAccountId(parsed.toAccountName)
-      if (!toAccountId || toAccountId === accountId) {
+      // For transfers, use pinned account as source when no source provided.
+      let fromAccountId = accountId
+      // Destination must be explicit — do not allow fallback
+      const toAccountId = resolveAccountId(parsed.toAccountName, false)
+      if (!toAccountId) {
+        setError('Transfer requires an explicit destination account (use @Account)')
+        return
+      }
+      if (toAccountId === fromAccountId) {
         setError('Transfer needs two different accounts')
         return
       }
       addToStaging({
         type: 'transfer',
-        accountId,
+        accountId: fromAccountId,
         toAccountId,
         amount: parsed.amount,
         date: parsed.date ?? today,
@@ -257,11 +343,52 @@ export function TerminalInput() {
 
   const tokens = tokenize(value)
 
+  const pinnedAccount = pinnedAccountId ? accounts.find((a) => a.id === pinnedAccountId) : null
+
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
-        <Terminal className="h-3 w-3" />
-        <span>Quick entry — type a command and press Enter</span>
+    <div className="space-y-2 relative">
+      <div className="px-1">
+        <div className="flex items-center gap-2">
+          <Terminal className="h-3 w-3" />
+          <span className="text-xs text-muted-foreground">Quick entry — type a command and press Enter</span>
+          <div className="ml-auto">
+            <div className="relative inline-block">
+              <button
+                type="button"
+                onClick={() => setPinMenuOpen((v) => !v)}
+                className="text-xs px-2 py-1 rounded-full bg-zinc-800/60 hover:bg-zinc-800/80"
+                aria-label="Choose default account for terminal input"
+              >
+                {pinnedAccount ? `Default: ${pinnedAccount.name}` : 'Default: (none)'}
+                <span className="ml-2 text-muted-foreground">▾</span>
+              </button>
+              {pinMenuOpen && (
+                <div className="absolute right-0 mt-2 w-44 rounded-md bg-popover border border-border shadow-lg z-50">
+                  <div className="p-2">
+                    <button
+                      type="button"
+                      onClick={() => { setPinnedAccountId(null); setPinMenuOpen(false) }}
+                      className="block w-full text-left px-2 py-1 text-sm text-muted-foreground hover:bg-accent/10 rounded"
+                    >
+                      Unset default
+                    </button>
+                    <div className="border-t my-1" />
+                    {accounts.map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => { setPinnedAccountId(a.id!); setPinMenuOpen(false) }}
+                        className="block w-full text-left px-2 py-1 text-sm hover:bg-accent/10 rounded"
+                      >
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="flex gap-2 items-end">
@@ -299,35 +426,75 @@ export function TerminalInput() {
           </div>
 
           {/* ── Autocomplete dropdown ── */}
-          {suggestions.length > 0 && (
-            <ul
-              ref={suggestionsRef}
-              className="absolute z-50 bottom-full mb-1 left-0 w-full rounded-md border border-border bg-popover shadow-lg overflow-hidden"
+          {(suggestions.length > 0 || suggestionType === 'd:') && suggestionType && (
+            <div
+              className="absolute z-50 top-full mt-1 left-0 w-full rounded-md border border-border bg-popover shadow-lg overflow-hidden"
             >
-              {suggestions.map((s, i) => (
-                <li key={s}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault()
-                      applySuggestion(s)
-                    }}
-                    className={cn(
-                      'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left transition-colors',
-                      i === activeIdx ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
-                    )}
-                  >
-                    <span className={cn('font-mono text-xs', suggestionType === '@' ? 'text-amber-400' : 'text-violet-400')}>
-                      {suggestionType}
-                    </span>
-                    <span>{s}</span>
-                    {i === activeIdx && (
-                      <span className="ml-auto text-[10px] text-muted-foreground">Tab</span>
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
+              {suggestionType === 'd:' && (
+                <>
+                  {suggestions.length > 0 && (
+                    <>
+                      <div className="flex items-center gap-1 px-3 py-1.5 text-[10px] text-muted-foreground">
+                        <CalendarDays className="h-3 w-3" />
+                        <span>Quick dates</span>
+                      </div>
+                      <ul ref={suggestionsRef} className="max-h-40 overflow-y-auto">
+                        {suggestions.map((s, i) => (
+                          <li key={s}>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => {
+                                e.preventDefault()
+                                applySuggestion(s)
+                              }}
+                              className={cn(
+                                'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left transition-colors',
+                                i === activeIdx ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
+                              )}
+                            >
+                              <span className="font-mono text-xs text-sky-400">d:</span>
+                              <span>{s}</span>
+                              {i === activeIdx && (
+                                <span className="ml-auto text-[10px] text-muted-foreground">Tab</span>
+                              )}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  <Separator />
+                  <InlineCalendar onSelectDate={handleDateSelect} />
+                </>
+              )}
+              {suggestionType !== 'd:' && (
+                <ul ref={suggestionsRef}>
+                  {suggestions.map((s, i) => (
+                    <li key={s}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          applySuggestion(s)
+                        }}
+                        className={cn(
+                          'flex items-center gap-2 w-full px-3 py-1.5 text-sm text-left transition-colors',
+                          i === activeIdx ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/50'
+                        )}
+                      >
+                        <span className={cn('font-mono text-xs', suggestionType === '@' ? 'text-amber-400' : 'text-violet-400')}>
+                          {suggestionType}
+                        </span>
+                        <span>{s}</span>
+                        {i === activeIdx && (
+                          <span className="ml-auto text-[10px] text-muted-foreground">Tab</span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
         </div>
 

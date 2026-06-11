@@ -83,6 +83,7 @@ export type SettingKey =
   | 'theme'
   | 'lastSyncAt'
   | 'paycycleDay'
+  
 
 export interface Setting {
   key: SettingKey
